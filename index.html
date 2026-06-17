@@ -1,0 +1,2417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HALO AI - Supply Chain Command Centre</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="_data_block.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+--teal:#006D6B;--forest:#37514F;--muted:#6E807F;--ltTeal:#C7DEDC;
+--pale:#EEF6F5;--pale2:#F0F7F6;--orange:#E87722;--amber:#F4A05B;
+--deep:#1C302F;--white:#FFFFFF;--rust:#C94F1A;--green:#4CAF50;--greenBg:#E8F5E9;
+--bannerBg:#FFF3E0;--shadow:0 2px 8px rgba(0,0,0,.08);
+}
+body{font-family:Calibri,sans-serif;background:#f5f7f7;color:var(--forest);line-height:1.5}
+/* HEADER */
+.header{background:var(--deep);color:var(--white);display:flex;align-items:center;padding:0 24px;height:64px;position:sticky;top:0;z-index:100}
+.header img{height:40px;margin-right:12px}
+.header .logo-text{font-size:22px;font-weight:700;letter-spacing:.5px}
+.header .logo-text span{color:var(--orange)}
+.header .subtitle{color:var(--ltTeal);font-size:12px;margin-left:8px;font-style:italic}
+.header .right{margin-left:auto;display:flex;align-items:center;gap:16px}
+.header .right select{background:var(--forest);color:var(--white);border:1px solid var(--muted);padding:4px 8px;border-radius:4px;font-family:Calibri}
+.header .upload-btn{background:var(--orange);color:#fff;border:none;padding:6px 14px;border-radius:4px;cursor:pointer;font-family:Calibri;font-weight:600;font-size:13px}
+.header .upload-btn:hover{background:var(--rust)}
+/* NAV TABS */
+.nav{background:var(--teal);display:flex;overflow-x:auto;padding:0 12px;position:sticky;top:64px;z-index:99}
+.nav button{background:none;border:none;color:var(--ltTeal);padding:12px 18px;font-family:Calibri;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;border-bottom:3px solid transparent;transition:.2s}
+.nav button:hover{color:#fff;background:rgba(255,255,255,.08)}
+.nav button.active{color:#fff;border-bottom-color:var(--orange);background:rgba(255,255,255,.06)}
+/* ACCENT BAR */
+.accent-bar{position:fixed;left:0;top:64px;width:5px;height:calc(100vh - 64px);background:var(--teal);z-index:101}
+/* LAYOUT */
+.page{display:none;padding:20px 24px 40px 24px;max-width:1440px;margin:0 auto}
+.page.active{display:block}
+.page-title{font-size:22px;font-weight:700;color:var(--teal);margin-bottom:4px}
+.page-sub{font-size:13px;color:var(--muted);font-style:italic;margin-bottom:20px}
+/* CARDS */
+.card-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-bottom:20px}
+.card{background:var(--white);border-radius:8px;padding:16px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+.card::before{content:'';position:absolute;top:0;left:0;width:4px;height:100%;background:var(--teal)}
+.card.orange::before{background:var(--orange)}
+.card .card-label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+.card .card-value{font-size:28px;font-weight:700;color:var(--teal);margin:4px 0}
+.card .card-sub{font-size:12px;color:var(--forest)}
+.card .card-trend{font-size:11px;font-weight:600;margin-top:4px}
+.card .card-trend.up{color:var(--green)}
+.card .card-trend.down{color:var(--rust)}
+.card.clickable{cursor:pointer;transition:transform .15s}
+.card.clickable:hover{transform:translateY(-2px);box-shadow:0 4px 16px rgba(0,0,0,.12)}
+/* CHART CONTAINERS */
+.chart-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
+.chart-row.triple{grid-template-columns:1fr 1fr 1fr}
+.chart-row.full{grid-template-columns:1fr}
+.chart-box{background:var(--white);border-radius:8px;padding:16px;box-shadow:var(--shadow);overflow:hidden}
+.chart-box h3{font-size:14px;color:var(--teal);margin-bottom:12px;font-weight:700}
+.chart-box canvas{width:100%!important;max-height:380px}
+/* TABLES */
+.tbl-wrap{background:var(--white);border-radius:8px;box-shadow:var(--shadow);overflow-x:auto;margin-bottom:20px}
+.tbl-wrap h3{padding:12px 16px 0;font-size:14px;color:var(--teal);font-weight:700}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead th{background:var(--teal);color:#fff;padding:10px 12px;text-align:left;font-weight:600;white-space:nowrap;position:sticky;top:0}
+tbody td{padding:8px 12px;border-bottom:1px solid #eee}
+tbody tr:nth-child(even){background:var(--pale2)}
+tbody tr:hover{background:var(--ltTeal)}
+tbody td:first-child{font-weight:700;color:var(--teal)}
+.tbl-scroll{max-height:400px;overflow-y:auto}
+/* TWO PANEL */
+.two-panel{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
+.panel{background:var(--pale);border-radius:8px;padding:20px;box-shadow:var(--shadow)}
+.panel.dark{background:var(--deep);color:var(--ltTeal)}
+.panel.dark h3{color:var(--white)}
+.panel h3{font-size:15px;color:var(--teal);margin-bottom:10px;font-weight:700}
+.panel p{font-size:13px;line-height:1.6}
+/* CALLOUT BANNER */
+.callout{background:var(--bannerBg);border:2px solid var(--orange);border-radius:8px;padding:14px 18px;margin-bottom:20px;display:flex;align-items:flex-start;gap:12px}
+.callout .badge{background:var(--orange);color:#fff;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
+.callout .text{font-size:13px;color:var(--forest)}
+.callout .text strong{color:var(--orange)}
+/* STATUS PILLS */
+.pill{display:inline-block;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:600}
+.pill.green{background:var(--greenBg);color:var(--green)}
+.pill.orange{background:var(--bannerBg);color:var(--orange)}
+.pill.red{background:#fde8e8;color:var(--rust)}
+/* STEP PILLS */
+.steps{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.step-pill{padding:6px 16px;border-radius:20px;color:#fff;font-size:12px;font-weight:600}
+/* FILTER BAR */
+.filter-bar{background:var(--white);border-radius:8px;padding:12px 16px;box-shadow:var(--shadow);margin-bottom:20px;display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.filter-bar label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase}
+.filter-bar select,.filter-bar input{border:1px solid #ccc;padding:5px 8px;border-radius:4px;font-family:Calibri;font-size:12px;min-width:120px}
+.filter-bar .filter-reset{background:var(--orange);color:#fff;border:none;padding:5px 14px;border-radius:4px;cursor:pointer;font-family:Calibri;font-weight:600;font-size:12px}
+/* UPLOAD MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center}
+.modal-overlay.show{display:flex}
+.modal{background:#fff;border-radius:12px;padding:32px;max-width:520px;width:90%;position:relative}
+.modal h2{color:var(--teal);margin-bottom:16px;font-size:18px}
+.modal .close{position:absolute;top:12px;right:16px;background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted)}
+.modal .drop-zone{border:2px dashed var(--teal);border-radius:8px;padding:40px;text-align:center;color:var(--muted);cursor:pointer;transition:.2s}
+.modal .drop-zone:hover,.modal .drop-zone.drag{border-color:var(--orange);background:var(--bannerBg)}
+.modal .drop-zone p{font-size:14px;margin-bottom:8px}
+.modal .drop-zone small{font-size:11px}
+.modal button.process{background:var(--teal);color:#fff;border:none;padding:10px 24px;border-radius:6px;cursor:pointer;font-family:Calibri;font-weight:600;font-size:14px;margin-top:16px;width:100%}
+.modal button.process:hover{background:var(--forest)}
+/* SECTION DIVIDER */
+.section-divider{background:var(--deep);color:var(--ltTeal);padding:10px 20px;border-radius:6px;margin:24px 0 16px;font-size:13px;font-weight:600}
+/* RESPONSIVE */
+@media(max-width:900px){
+.chart-row,.two-panel{grid-template-columns:1fr}
+.card-row{grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
+}
+@media(max-width:600px){
+.header{padding:0 12px}
+.nav button{padding:10px 12px;font-size:12px}
+.page{padding:12px}
+}
+</style>
+</head>
+<body>
+
+<div class="accent-bar"></div>
+
+<!-- HEADER -->
+<div class="header">
+<img src="himalaya logo.avif" alt="Himalaya" onerror="this.style.display='none'">
+<div>
+<div class="logo-text">HALO <span>AI</span></div>
+<div class="subtitle">Supply Chain Command Centre &mdash; METAP Region</div>
+</div>
+<div class="right">
+<select id="globalMonth" onchange="applyGlobalFilter()"><option value="all">All Months</option></select>
+<select id="globalYear" onchange="applyGlobalFilter()"><option value="all">All Years</option></select>
+<button class="reset-btn" onclick="resetGlobalFilter()" title="Reset filters to default" style="background:var(--forest);color:#fff;border:none;padding:6px 14px;border-radius:4px;cursor:pointer;font:600 13px Calibri,sans-serif">&#x21BA; Reset</button>
+<span id="fileStatus" style="display:none"></span>
+<span id="excelControls" style="display:none"><input type="checkbox" id="autoWatch"></span>
+</div>
+</div>
+
+<!-- NAV -->
+<div class="nav" id="navBar">
+<button class="active" data-tab="executive">Executive Overview</button>
+<button data-tab="warehouse">Warehouse Operations</button>
+<button data-tab="inventory">Inventory &amp; Storage</button>
+<button data-tab="quality">Quality &amp; Compliance</button>
+<button data-tab="cost">Cost &amp; Efficiency</button>
+<button data-tab="freight">Freight &amp; Transportation</button>
+<button data-tab="orders">Orders &amp; Service Levels</button>
+<button data-tab="copacking">Co-Packing Performance</button>
+<button data-tab="environment">Environmental Monitoring</button>
+<button data-tab="maintenance">Maintenance Guide</button>
+</div>
+
+<!-- UPLOAD MODAL -->
+<div class="modal-overlay" id="uploadModal">
+<div class="modal">
+<button class="close" onclick="this.parentElement.parentElement.classList.remove('show')">&times;</button>
+<h2>Upload Monthly WMS Data</h2>
+<p style="font-size:13px;color:var(--muted);margin-bottom:16px">Upload the monthly source data file exported from Holisol WMS. The dashboard will automatically refresh all views.</p>
+<div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+<p>Drop your .xlsx file here or click to browse</p>
+<small>Accepts: .xlsx, .xls, .csv</small>
+<input type="file" id="fileInput" accept=".xlsx,.xls,.csv" style="display:none">
+</div>
+<div id="uploadStatus" style="margin-top:12px;font-size:13px;color:var(--teal);display:none"></div>
+<button class="process" id="processBtn" style="display:none" onclick="processUpload()">Process &amp; Refresh Dashboard</button>
+</div>
+</div>
+
+<!-- ========== TAB: EXECUTIVE OVERVIEW ========== -->
+<div class="page active" id="page-executive">
+<div class="page-title">Executive Overview</div>
+<div class="page-sub">Current Month Summary &mdash; METAP Warehousing Operations</div>
+
+<div class="callout">
+<div class="badge">!</div>
+<div class="text"><strong>Key Insight:</strong> <span id="execInsight">Loading...</span></div>
+</div>
+
+<div class="card-row" id="execCards"></div>
+
+<div class="chart-row">
+<div class="chart-box"><h3>Stock Flow Trend (Monthly)</h3><canvas id="chartStockFlow"></canvas></div>
+<div class="chart-box"><h3>Inbound vs Outbound Cases</h3><canvas id="chartInbOutb"></canvas></div>
+</div>
+
+<div class="chart-row">
+<div class="chart-box"><h3>Monthly Cost Trend (AED)</h3><canvas id="chartCostTrend"></canvas></div>
+<div class="chart-box"><h3>Waiting Charges by Country</h3><canvas id="chartWaiting"></canvas></div>
+</div>
+
+<div class="section-divider">YTD Trends</div>
+<div class="chart-row">
+<div class="chart-box"><h3>YTD Stock Trend (Opening &amp; Closing)</h3><canvas id="chartYtdStock"></canvas></div>
+<div class="chart-box"><h3>YTD Inbound vs Outbound Cases</h3><canvas id="chartYtdInbOut"></canvas></div>
+</div>
+
+<div class="section-divider">Action Items &amp; Open Subjects</div>
+<div class="tbl-wrap"><div class="tbl-scroll"><table id="tblSubjects">
+<thead><tr><th>Month</th><th>Description</th><th>Responsible</th><th>Status</th><th>Action</th></tr></thead>
+<tbody></tbody>
+</table></div></div>
+</div>
+
+<!-- ========== TAB: WAREHOUSE OPERATIONS ========== -->
+<div class="page" id="page-warehouse">
+<div class="page-title">Warehouse Operations</div>
+<div class="page-sub">Inbound, Outbound, Stock Flow, Truck Turnaround &amp; Handling Productivity</div>
+
+<div class="filter-bar">
+<label>Site</label><select id="whSite" onchange="reRenderWarehouse()"><option value="all">All Sites</option></select>
+<button class="filter-reset" onclick="resetWhFilter()">Reset</button>
+</div>
+
+<div class="card-row" id="whCards"></div>
+
+<div class="chart-row">
+<div class="chart-box"><h3>Weekly Inbound Flow (Cases &amp; Pallets)</h3><canvas id="chartInbFlow"></canvas></div>
+<div class="chart-box"><h3>Inbound Plan vs GRN Achievement (%)</h3><canvas id="chartPlanGrn"></canvas></div>
+</div>
+
+<div class="chart-row">
+<div class="chart-box"><h3>Hub-wise Inbound Volume</h3><canvas id="chartHubInb"></canvas></div>
+<div class="chart-box"><h3>Truck Turnaround Time Distribution</h3><canvas id="chartTruckTurn"></canvas></div>
+</div>
+
+<div class="section-divider">Inbound Summary by Site</div>
+<div class="chart-row">
+<div class="chart-box"><h3>Inbound Cases by Site (Annual)</h3><canvas id="chartInbSummSite"></canvas></div>
+<div class="chart-box"><h3>Avg Truck Turnover Time by Site</h3><canvas id="chartTruckSite"></canvas></div>
+</div>
+
+<div class="section-divider">Inbound Issues Log</div>
+<div class="tbl-wrap"><div class="tbl-scroll"><table id="tblInbIssues">
+<thead><tr><th>Date</th><th>Vendor</th><th>ASN</th><th>Item</th><th>ASN Qty</th><th>Physical</th><th>Diff</th><th>Remarks</th><th>Status</th></tr></thead>
+<tbody></tbody>
+</table></div></div>
+
+<div class="section-divider">Recent Inbound Detail (GRNs)</div>
+<div class="tbl-wrap"><div class="tbl-scroll"><table id="tblInbDetail">
+<thead><tr><th>Client</th><th>GRN No</th><th>Vendor</th><th>Description</th><th>SKU</th><th>Cases</th><th>Created At</th><th>Year</th></tr></thead>
+<tbody></tbody>
+</table></div></div>
+</div>
+
+<!-- ========== TAB: INVENTORY & STORAGE ========== -->
+<div class="page" id="page-inventory">
+<div class="page-title">Inventory &amp; Storage</div>
+<div class="page-sub">Pallet Aging, Storage Profiles, Utilization &amp; Expiry Tracking</div>
+
+<div class="filter-bar">
+<label>Hub</label><select id="invHub" onchange="reRenderInventory()"><option value="all">All Hubs</option></select>
+<button class="filter-reset" onclick="resetInvFilter()">Reset</button>
+</div>
+
+<div class="card-row" id="invCards"></div>
+
+<div class="chart-row">
+<div class="chart-box"><h3>Pallet Aging Distribution</h3><canvas id="chartAging"></canvas></div>
+<div class="chart-box"><h3>Storage Pallet-Days by Hub</h3><canvas id="chartStorageHub"></canvas></div>
+</div>
+
+<div class="chart-row">
+<div class="chart-box"><h3>Storage Profile (Days Bands)</h3><canvas id="chartStorageBand"></canvas></div>
+<div class="chart-box"><h3>Stock Movement (Opening/Closing)</h3><canvas id="chartStockMov"></canvas></div>
+</div>
+
+<div class="section-divider">Expired &amp; Near-Expiry Stock</div>
+<div class="tbl-wrap"><div class="tbl-scroll"><table id="tblExpired">
+<thead><tr><th>SKU</th><th>Description</th><th>MFD</th><th>Expiry</th><th>Pack Size</th><th>Qty</th><th>Month</th></tr></thead>
+<tbody></tbody>
+</table></div></div>
+</div>
+
+<!-- ========== TAB: QUALITY & COMPLIANCE ========== -->
+<div class="page" id="page-quality">
+<div class="page-title">Quality &amp; Compliance</div>
+<div class="page-sub">Quality Issues, Inbound/Handling Damages &amp; Customer Complaints</div>
+
+<div class="filter-bar">
+<label>Site</label><select id="qualSite" onchange="reRenderQuality()"><option value="all">All Sites</option></select>
+<label>Vendor</label><select id="qualVendor" onchange="reRenderQuality()"><option value="all">All Vendors</option></select>
+<button class="filter-reset" onclick="resetQualFilter()">Reset</button>
+</div>
+
+<div class="card-row" id="qualCards"></div>
+
+<div class="chart-row">
+<div class="chart-box"><h3>Damage % by Vendor</h3><canvas id="chartDamageVendor"></canvas></div>
+<div class="chart-box"><h3>Quality Issues by Type</h3><canvas id="chartQualType"></canvas></div>
+</div>
+
+<div class="chart-row">
+<div class="chart-box"><h3>Customer Complaints Trend</h3><canvas id="chartComplaintTrend"></canvas></div>
+<div class="chart-box"><h3>Complaint Types Distribution</h3><canvas id="chartComplaintType"></canvas></div>
+</div>
+
+<div class="section-divider">Warehouse Handling Damages</div>
+<div class="tbl-wrap"><div class="tbl-scroll"><table id="tblWhDamages">
+<thead><tr><th>Month</th><th>SKU</th><th>Description</th><th>Qty</th><th>Expiry</th><th>Remarks</th><th>Vendor</th></tr></thead>
+<tbody></tbody>
+</table></div></div>
+
+<div class="section-divider">Customer Complaints</div>
+<div class="tbl-wrap"><div class="tbl-scroll"><table id="tblComplaints">
+<thead><tr><th>Date</th><th>Customer</th><th>Item</th><th>DO Qty</th><th>Received</th><th>Diff</th><th>Type</th><th>Status</th></tr></thead>
+<tbody></tbody>
+</table></div></div>
+
+<div class="section-divider">FZE SKU Gross Weight Verification</div>
+<div class="tbl-wrap"><div class="tbl-scroll"><table id="tblFzeGw">
+<thead><tr><th>Month</th><th>SR No</th><th>Item Code</th><th>Description</th><th>GW Box-1</th><th>GW Box-2</th><th>GW Box-3</th><th>GW Box-4</th><th>GW Box-5</th></tr></thead>
+<tbody></tbody>
+</table></div></div>
+</div>
+
+<!-- ========== TAB: COST & EFFICIENCY ========== -->
+<div class="page" id="page-cost">
+<div class="page-title">Cost &amp; Efficiency</div>
+<div class="page-sub">Storage Costs, Cost per Pallet/Case, Overtime, Management Fees &amp; Benchmarks</div>
+
+<div class="filter-bar">
+<label>Hub</label><select id="costHub" onchange="reRenderCost()"><option value="all">All Hubs</option></select>
+<button class="filter-reset" onclick="resetCostFilter()">Reset</button>
+</div>
+
+<div class="card-row" id="costCards"></div>
+
+<div class="chart-row">
+<div class="chart-box"><h3>Monthly Cost Breakdown (AED)</h3><canvas id="chartCostBreak"></canvas></div>
+<div class="chart-box"><h3>Cost per Pallet / Cost per Case Trend</h3><canvas id="chartCostUnit"></canvas></div>
+</div>
+
+<div class="chart-row">
+<div class="chart-box"><h3>Invoice Summary by Hub</h3><canvas id="chartInvoiceHub"></canvas></div>
+<div class="chart-box"><h3>Overtime Hours &amp; Costs</h3><canvas id="chartOvertime"></canvas></div>
+</div>
+
+<div class="section-divider">Detailed Costing Table</div>
+<div class="tbl-wrap"><div class="tbl-scroll"><table id="tblCosting">
+<thead><tr><th>Month</th><th>Inbound</th><th>Outbound</th><th>Storage</th><th>Total Cases</th><th>Pallets In</th><th>Pallets Out</th><th>Handling In</th><th>Handling Out</th><th>Pick &amp; Pack</th><th>OT</th><th>Mgmt Fee</th><th>Total (AED)</th></tr></thead>
+<tbody></tbody>
+</table></div></div>
+</div>
+
+<!-- ========== TAB: FREIGHT & TRANSPORTATION ========== -->
+<div class="page" id="page-freight">
+<div class="page-title">Freight &amp; Transportation</div>
+<div class="page-sub">Shipment Movement, Transport Modes, Equipment Profiles &amp; Loadability</div>
+
+<div class="filter-bar">
+<label>Country</label><select id="frCountry" onchange="reRenderFreight()"><option value="all">All Countries</option></select>
+<button class="filter-reset" onclick="resetFrFilter()">Reset</button>
+</div>
+
+<div class="card-row" id="freightCards"></div>
+
+<div class="chart-row">
+<div class="chart-box"><h3>Freight by Country (Cases)</h3><canvas id="chartFreightCountry"></canvas></div>
+<div class="chart-box"><h3>Pallet &amp; Case Load Ability %</h3><canvas id="chartLoadability"></canvas></div>
+</div>
+
+<div class="chart-row">
+<div class="chart-box"><h3>Equipment Profile Mix</h3><canvas id="chartEquipment"></canvas></div>
+<div class="chart-box"><h3>Freight Cost per Case by Country</h3><canvas id="chartFreightCost"></canvas></div>
+</div>
+
+<div class="section-divider">Truck Turnover Analysis</div>
+<div class="chart-row">
+<div class="chart-box"><h3>Avg Turnover Time by Month (minutes)</h3><canvas id="chartTurnoverMonth"></canvas></div>
+<div class="chart-box"><h3>Turnover Time by Site (avg minutes)</h3><canvas id="chartTurnoverSite"></canvas></div>
+</div>
+
+<div class="section-divider">Waiting Charges by Country</div>
+<div class="tbl-wrap"><div class="tbl-scroll"><table id="tblWaiting">
+<thead><tr><th>Month</th><th>KSA</th><th>Oman</th><th>UAE</th><th>Bahrain</th><th>Kuwait</th><th>Qatar</th><th>Jordan</th><th>Total</th></tr></thead>
+<tbody></tbody>
+</table></div></div>
+</div>
+
+<!-- ========== TAB: ORDERS & SERVICE LEVELS ========== -->
+<div class="page" id="page-orders">
+<div class="page-title">Orders &amp; Service Levels</div>
+<div class="page-sub">Required Orders, Manual Orders, Shipped Cases/Pallets &amp; Service Trends</div>
+
+<div class="filter-bar">
+<label>Week</label><select id="ordWeek" onchange="reRenderOrders()"><option value="all">All Weeks</option></select>
+<button class="filter-reset" onclick="resetOrdFilter()">Reset</button>
+</div>
+
+<div class="card-row" id="orderCards"></div>
+
+<div class="chart-row">
+<div class="chart-box"><h3>Week-wise Order Distribution</h3><canvas id="chartWeekOrders"></canvas></div>
+<div class="chart-box"><h3>Manual vs API Orders (%)</h3><canvas id="chartManualOrders"></canvas></div>
+</div>
+
+<div class="chart-row">
+<div class="chart-box"><h3>Outbound Cases by Customer (Top 10)</h3><canvas id="chartOutbCust"></canvas></div>
+<div class="chart-box"><h3>Trucks &amp; Containers by Customer</h3><canvas id="chartTrucksCust"></canvas></div>
+</div>
+
+<div class="section-divider">Hub-wise Outbound Summary</div>
+<div class="tbl-wrap"><div class="tbl-scroll"><table id="tblHubOutbound">
+<thead><tr><th>Customer</th><th>Month</th><th>GCC &amp; NA</th><th>Latvia</th><th>SA &amp; E Africa</th><th>HUSA</th><th>Europe</th><th>Russia</th></tr></thead>
+<tbody></tbody>
+</table></div></div>
+</div>
+
+<!-- ========== TAB: CO-PACKING ========== -->
+<div class="page" id="page-copacking">
+<div class="page-title">Co-Packing Performance</div>
+<div class="page-sub">Co-Packing Volume, Order Status &amp; Week-wise Tracking</div>
+
+<div class="filter-bar">
+<label>Customer</label><select id="cpCust" onchange="reRenderCoPacking()"><option value="all">All Customers</option></select>
+<button class="filter-reset" onclick="resetCpFilter()">Reset</button>
+</div>
+
+<div class="card-row" id="copackCards"></div>
+
+<div class="chart-row">
+<div class="chart-box"><h3>Co-Packing Weekly Orders &amp; Cases</h3><canvas id="chartCopackWeek"></canvas></div>
+<div class="chart-box"><h3>Co-Packing Volume by Type</h3><canvas id="chartCopackType"></canvas></div>
+</div>
+
+<div class="section-divider">Co-Packing Orders Detail</div>
+<div class="tbl-wrap"><div class="tbl-scroll"><table id="tblCoPacking">
+<thead><tr><th>Month</th><th>Order No</th><th>Customer</th><th>SKU</th><th>Description</th><th>Cases</th><th>Remarks</th></tr></thead>
+<tbody></tbody>
+</table></div></div>
+</div>
+
+<!-- ========== TAB: ENVIRONMENTAL ========== -->
+<div class="page" id="page-environment">
+<div class="page-title">Environmental &amp; Monitoring Metrics</div>
+<div class="page-sub">Temperature Logs &amp; Warehouse Operating Conditions</div>
+
+<div class="card-row" id="envCards"></div>
+
+<div class="chart-row full">
+<div class="chart-box"><h3>Daily Temperature Log (Min / Max / Avg)</h3><canvas id="chartTemp" style="max-height:400px"></canvas></div>
+</div>
+
+<div class="callout">
+<div class="badge">i</div>
+<div class="text"><strong>Compliance Note:</strong> Warehouse temperature must be maintained between 15&deg;C and 30&deg;C for product integrity. Any deviations trigger automated alerts.</div>
+</div>
+</div>
+
+<!-- ========== TAB: MAINTENANCE GUIDE ========== -->
+<div class="page" id="page-maintenance">
+<div class="page-title">Dashboard Maintenance Guide</div>
+<div class="page-sub">Step-by-step administrative guide for maintaining and updating the dashboard</div>
+
+<div class="steps">
+<div class="step-pill" style="background:var(--teal)">1. Export Data</div>
+<div class="step-pill" style="background:#2E7D32">2. Format File</div>
+<div class="step-pill" style="background:#558B2F">3. Upload</div>
+<div class="step-pill" style="background:var(--orange)">4. Verify</div>
+<div class="step-pill" style="background:var(--rust)">5. Archive</div>
+</div>
+
+<div class="two-panel">
+<div class="panel">
+<h3>Step 1: Export Monthly Data from WMS</h3>
+<p>At the end of each month, export the following reports from the Holisol WMS system:</p>
+<ul style="font-size:13px;margin:8px 0 0 16px">
+<li>Inbound/GRN data (Plan vs Actual)</li>
+<li>Outbound shipment details</li>
+<li>Stock flow (Opening, Closing, Movement)</li>
+<li>Quality issues and damage reports</li>
+<li>Freight and transportation logs</li>
+<li>Co-packing orders and production</li>
+<li>Temperature monitoring data</li>
+<li>Costing and invoice details</li>
+</ul>
+</div>
+<div class="panel">
+<h3>Step 2: Format the Source File</h3>
+<p>Ensure the exported file follows the standard template structure:</p>
+<ul style="font-size:13px;margin:8px 0 0 16px">
+<li>File format: .xlsx (Excel Workbook)</li>
+<li>Sheet naming must match the standard convention (e.g., "20. Stock Flow", "15. Costing_Det")</li>
+<li>Column headers must remain unchanged</li>
+<li>New monthly data should be appended as new rows</li>
+<li>Do not modify or delete historical data</li>
+<li>Date format: MMM-YY (e.g., Jan-25)</li>
+</ul>
+</div>
+</div>
+
+<div class="two-panel">
+<div class="panel dark">
+<h3>Step 3: Upload to Dashboard</h3>
+<p>Click the <strong style="color:var(--orange)">Upload Data</strong> button in the top navigation bar. Drag and drop or browse for the formatted .xlsx file. The system will validate the file structure before processing.</p>
+<p style="margin-top:8px">Upon successful upload, all KPI cards, charts, and tables will automatically refresh with the new data. No manual UI changes are required.</p>
+</div>
+<div class="panel dark">
+<h3>Step 4: Verify &amp; Archive</h3>
+<p>After upload, verify the following across all tabs:</p>
+<ul style="font-size:13px;margin:8px 0 0 16px;color:var(--ltTeal)">
+<li>Executive KPI cards show updated values</li>
+<li>All chart trend lines include the new month</li>
+<li>Tables display the latest records</li>
+<li>Filter dropdowns include new period options</li>
+</ul>
+<p style="margin-top:8px">Archive the previous month's source file in the designated backup folder for audit compliance.</p>
+</div>
+</div>
+
+<div class="callout">
+<div class="badge">!</div>
+<div class="text"><strong>Important:</strong> Always back up the current dashboard_data.json and dashboard_data2.json files before uploading new data. The dashboard reads from these two JSON files located in the same directory as this HTML file.</div>
+</div>
+
+<div class="section-divider">Data Source Reference</div>
+<div class="tbl-wrap"><table>
+<thead><tr><th>Sheet #</th><th>Sheet Name</th><th>Dashboard Section</th><th>Key Metrics</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Subjects</td><td>Executive Overview</td><td>Action items, open issues</td></tr>
+<tr><td>2</td><td>Inb. Plan vs GRN</td><td>Warehouse Ops</td><td>Plan adherence %</td></tr>
+<tr><td>3-4</td><td>Quality / Damages</td><td>Quality</td><td>Issue count, damage %</td></tr>
+<tr><td>5-6</td><td>Orders</td><td>Orders &amp; Service</td><td>Weekly orders, manual %</td></tr>
+<tr><td>7</td><td>Freights</td><td>Freight</td><td>Cases, trucks, costs</td></tr>
+<tr><td>8</td><td>Waiting Charges</td><td>Freight / Cost</td><td>Country-wise charges</td></tr>
+<tr><td>9</td><td>Truck Turnover</td><td>Warehouse Ops</td><td>Turnaround times</td></tr>
+<tr><td>10</td><td>Storage</td><td>Inventory</td><td>Pallet days, utilization</td></tr>
+<tr><td>11</td><td>Expired Stock</td><td>Inventory</td><td>Near-expiry items</td></tr>
+<tr><td>12</td><td>WH Damages</td><td>Quality</td><td>Handling damage log</td></tr>
+<tr><td>13</td><td>Loading Capacity</td><td>Freight</td><td>Loadability %</td></tr>
+<tr><td>14</td><td>Moving Ageing</td><td>Inventory</td><td>Pallet aging bands</td></tr>
+<tr><td>15</td><td>Costing</td><td>Cost &amp; Efficiency</td><td>All cost components</td></tr>
+<tr><td>16-18</td><td>Inbound Summary</td><td>Warehouse Ops</td><td>Hub-wise inbound</td></tr>
+<tr><td>19</td><td>Outbound Summary</td><td>Orders</td><td>Hub-wise outbound</td></tr>
+<tr><td>20</td><td>Stock Flow</td><td>Executive / Inventory</td><td>Opening, closing stock</td></tr>
+<tr><td>21</td><td>Temp Report</td><td>Environmental</td><td>Min, max, avg temp</td></tr>
+<tr><td>23</td><td>Outbound Cases/Pallets</td><td>Orders</td><td>Customer-wise shipments</td></tr>
+<tr><td>25</td><td>Invoice Summary</td><td>Cost</td><td>Hub-wise billing</td></tr>
+<tr><td>26</td><td>Overtime</td><td>Cost</td><td>OT hours &amp; amount</td></tr>
+<tr><td>28-31</td><td>Co-Packing</td><td>Co-Packing</td><td>Orders, volume, weekly</td></tr>
+<tr><td>29</td><td>Customer Complaints</td><td>Quality</td><td>Complaint type &amp; status</td></tr>
+</tbody>
+</table></div>
+</div>
+
+<script>
+// ==================== DATA LOADING ====================
+let DATA = {};
+let DATA2 = {};
+let allCharts = {};
+
+// Parse an uploaded Excel workbook using SheetJS
+function parseWorkbook(wb) {
+    const get = (name) => {
+        const ws = wb.Sheets[name];
+        if (!ws) return [];
+        return XLSX.utils.sheet_to_json(ws, {defval:''});
+    };
+    return {
+        stockFlow: get('19. Stock Flow'),
+        costingDet: get('14. Costing Details'),
+        costingCases: get('14. Costing Details'),
+        waitingCharges: get('8. Waiting Charges'),
+        weeklyOrders: get('5. Week-wise Orders Details'),
+        damages: get('4. % of Damages'),
+        qualityIssues: get('3. Quality Issues'),
+        manualOrders: get('6. Manual orders'),
+        palletAging: get('13. Mov. Ageing'),
+        copackingWeekly: get('29. COPACKING ORDERS-WEEK WISE'),
+        whDamages: get('12. WH Handling Damages'),
+        inboundFlow: get('16. Inbound Flow-25'),
+        invoiceSummary: get('24. WH Invoice Summary'),
+        tempReport: get('20. Temp report'),
+        subjects: get('1. Subjects'),
+        hubInbound: get('15. Hubwise Inbound Summary'),
+        hubOutbound: get('18. Hubwise Outbound Summary'),
+        storage: get('10. Storage'),
+        copackingOrders: get('28. Co-Packing Orders'),
+        coPacking: get('26. Co-Packing'),
+        customerComplaints: get('27. Customers Complaints'),
+        inboundIssues: get('25. Inbound Issues'),
+        inbGrnMonthly: get('2. Inbound Plan vs GRN'),
+        expiredStock: get('11. Expiry & Near Expire'),
+        freights: get('7. Freights'),
+        outboundCases: get('22. Outbound Summary'),
+        storageHub: get('10. Storage'),
+        truckTurnover: get('9. Truck Turnover Time'),
+        inboundSummary: get('17. Inbound Summary'),
+        inboundDetail: get('21. Inbound Detail'),
+        ytdTrends: get('23. YTD Trends'),
+        fzeSkuGw: get("30. FZE SKU's GW Details")
+    };
+}
+
+// Convert Excel serial number to Mon-YY string (e.g. 44562 -> "Jan-22")
+function excelDateToMonYY(serial) {
+    const s = String(serial).trim();
+    // Already formatted as Mon-YY or similar text
+    if (/[a-zA-Z]/.test(s)) return s;
+    const n = parseFloat(s);
+    if (isNaN(n) || n < 30000 || n > 60000) return s;
+    // Excel epoch: Jan 0, 1900 (with the Lotus 1-2-3 leap year bug)
+    const d = new Date((n - 25569) * 86400000);
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return months[d.getUTCMonth()] + '-' + String(d.getUTCFullYear()).slice(-2);
+}
+
+// Convert Excel serial to DD-MM-YYYY (for daily dates like temp report, complaints)
+function excelDateToDMY(serial) {
+    const s = String(serial).trim();
+    if (/[a-zA-Z]/.test(s) || s.includes('/') || (s.includes('-') && s.length > 7)) return s;
+    const n = parseFloat(s);
+    if (isNaN(n) || n < 30000 || n > 60000) return s;
+    const d = new Date((n - 25569) * 86400000);
+    return d.getUTCDate() + '-' + (d.getUTCMonth()+1) + '-' + d.getUTCFullYear();
+}
+
+// Fix all Excel serial dates across all datasets
+function fixAllDates() {
+    // Monthly date fields -> Mon-YY format
+    const monthFields = [
+        ['stockFlow','Month'], ['costingDet','Month-Year'], ['waitingCharges','Month&Year'],
+        ['weeklyOrders','Month'], ['damages','Month'], ['manualOrders','Month&Year'],
+        ['palletAging','Month'], ['inboundFlow','Month'], ['invoiceSummary','Month'],
+        ['copackingWeekly','Month'], ['whDamages','Month'], ['qualityIssues','Month'],
+        ['storage','Month'], ['hubInbound','Date'], ['hubOutbound','Month Name'],
+        ['coPacking','Month Name'], ['coPacking','Month'], ['expiredStock','Month Name'], ['inbGrnMonthly','Month-Year'],
+        ['freights','Month'], ['copackingOrders','Month'],
+        ['subjects','MonthYear'], ['ytdTrends','Month'], ['fzeSkuGw','Year - Month']
+    ];
+    for (const [ds, key] of monthFields) {
+        if (DATA[ds]) DATA[ds].forEach(r => { if (r[key]) r[key] = excelDateToMonYY(r[key]); });
+    }
+    // Daily date fields -> DD-MM-YYYY format
+    const dailyFields = [
+        ['tempReport','Date'], ['customerComplaints','Date'], ['inboundIssues','Date']
+    ];
+    for (const [ds, key] of dailyFields) {
+        if (DATA[ds]) DATA[ds].forEach(r => { if (r[key]) r[key] = excelDateToDMY(r[key]); });
+    }
+    // Also fix MFD/Expiry dates in expiredStock
+    if (DATA.expiredStock) DATA.expiredStock.forEach(r => {
+        if (r['MFD Date']) r['MFD Date'] = excelDateToDMY(r['MFD Date']);
+        if (r['Expiry Date']) r['Expiry Date'] = excelDateToDMY(r['Expiry Date']);
+    });
+}
+
+function loadData() {
+    // Use EMBEDDED_DATA defined in the inline script block
+    if (typeof EMBEDDED_DATA !== 'undefined' && EMBEDDED_DATA) {
+        Object.assign(DATA, EMBEDDED_DATA);
+        DATA2 = { freights: DATA.freights, loadingCapacity: DATA.loadingCapacity || [],
+                   outboundCases: DATA.outboundCases, trucksContainers: DATA.trucksContainers || [] };
+    }
+    if (!DATA.stockFlow || DATA.stockFlow.length === 0) generateSampleData();
+    fixAllDates();
+    normalizeData();
+    initDashboard();
+}
+
+function normalizeData() {
+    const MON = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const MON3 = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+    // Waiting Charges: pivot from (Year, Site, Jan-Dec) to (Month&Year, KSA, OMAN, UAE, ...)
+    if (DATA.waitingCharges && DATA.waitingCharges.length > 0 && DATA.waitingCharges[0].Site) {
+        const wcRaw = DATA.waitingCharges;
+        const years = [...new Set(wcRaw.map(r => r.Year))].filter(Boolean).sort();
+        const wcNew = [];
+        years.forEach(y => {
+            MON.forEach((m, mi) => {
+                const row = {'Month&Year': MON3[mi] + '-' + String(y).slice(-2)};
+                let total = 0;
+                wcRaw.filter(r => r.Year == y).forEach(r => {
+                    const site = (r.Site||'').trim();
+                    const val = num(r[m]);
+                    row[site] = val;
+                    total += val;
+                });
+                row.Total = total;
+                if (total > 0) wcNew.push(row);
+            });
+        });
+        DATA.waitingCharges = wcNew;
+    }
+
+    // Damages: sum damage sub-columns into unified column
+    if (DATA.damages) {
+        DATA.damages.forEach(r => {
+            if (!r['Damaged / Short Units Qty in cases']) {
+                r['Damaged / Short Units Qty in cases'] = num(r.Leakage) + num(r['Product Damage']) + num(r['Unit Shorage']) + num(r['Product without Label / Cap']);
+            }
+        });
+    }
+
+    // Subjects: combine YEAR + Month into MonthYear if needed
+    if (DATA.subjects) {
+        DATA.subjects.forEach(r => {
+            if (!r.MonthYear && r.Month) r.MonthYear = r.Month;
+            if (!r.MonthYear && r.YEAR && r.Month) r.MonthYear = r.Month + '-' + String(r.YEAR).slice(-2);
+        });
+    }
+
+    // Co-Packing & Hub Outbound: normalize Month Name vs Month
+    ['coPacking','hubOutbound'].forEach(ds => {
+        if (DATA[ds]) DATA[ds].forEach(r => {
+            if (!r['Month Name'] && r.Month) r['Month Name'] = r.Month;
+        });
+    });
+
+    // Costing Details: merge cost amounts with case counts (split due to duplicate headers)
+    if (DATA.costingCases && DATA.costingDet) {
+        DATA.costingDet.forEach((r, i) => {
+            const cases = DATA.costingCases[i];
+            if (cases) {
+                r['Inbound Cases'] = cases['Inbound Cases'];
+                r['Outbound Cases'] = cases['Outbound Cases'];
+                r['Storage Cases'] = cases['Storage Cases'];
+                r['Total Cases'] = cases['Total Cases'];
+                r['Pallets In'] = cases['Pallets In'];
+                r['Pallets Out'] = cases['Pallets Out'];
+                r['Total Pallets'] = cases['Total Pallets'];
+            }
+            if (!r['Total price (AED)'] && r.Total) r['Total price (AED)'] = r.Total;
+        });
+    }
+
+    // Inbound Plan vs GRN: pivot from (Year, Month, SITE, Type, WK1-WK5, Total) to dashboard format
+    if (DATA.inbGrnMonthly && DATA.inbGrnMonthly.length > 0 && DATA.inbGrnMonthly[0].Type) {
+        const raw = DATA.inbGrnMonthly;
+        const groups = {};
+        raw.forEach(r => {
+            const key = `${r.Year||''}-${r.Month||''}-${r.SITE||''}`;
+            if (!groups[key]) groups[key] = {Year:r.Year, Month:r.Month, SITE:r.SITE, Plan:0, GRN:0};
+            const total = num(r.Total) || (num(r.WK1)+num(r.WK2)+num(r.WK3)+num(r.WK4)+num(r.WK5));
+            if ((r.Type||'').toLowerCase().includes('plan')) groups[key].Plan = total;
+            else groups[key].GRN = total;
+        });
+        const grnNew = Object.values(groups).map(g => ({
+            'Month-Year': g.Month ? g.Month.substring(0,3) + '-' + String(g.Year).slice(-2) : '',
+            Week: g.SITE || '', 'GRN Cases': g.GRN, 'Planned cases': g.Plan
+        }));
+        DATA.inbGrnMonthly = grnNew;
+    }
+}
+
+function generateSampleData() {
+    const months = ['Jan-22','Feb-22','Mar-22','Apr-22','May-22','Jun-22','Jul-22','Aug-22','Sep-22','Oct-22','Nov-22','Dec-22',
+                    'Jan-23','Feb-23','Mar-23','Apr-23','May-23','Jun-23','Jul-23','Aug-23','Sep-23','Oct-23','Nov-23','Dec-23',
+                    'Jan-24','Feb-24','Mar-24','Apr-24','May-24','Jun-24','Jul-24','Aug-24','Sep-24','Oct-24','Nov-24','Dec-24',
+                    'Jan-25','Feb-25','Mar-25','Apr-25','May-25','Jun-25'];
+
+    DATA.stockFlow = months.map((m,i) => ({
+        'Month': m,
+        'Opening Stock': String(150000 + Math.floor(Math.random()*80000)),
+        'Inbound': String(100000 + Math.floor(Math.random()*120000)),
+        'Outbound': String(80000 + Math.floor(Math.random()*100000)),
+        'Closing Stock': String(160000 + Math.floor(Math.random()*100000))
+    }));
+
+    DATA.costingDet = months.slice(0,52).map((m,i) => ({
+        'Month-Year': m,
+        'Inbound Cases': String(100000+Math.floor(Math.random()*100000)),
+        'Outbound Cases': String(60000+Math.floor(Math.random()*80000)),
+        'Storage Cases': String(150000+Math.floor(Math.random()*80000)),
+        'Total Cases': String(350000+Math.floor(Math.random()*100000)),
+        'Pallets In': String(1000+Math.floor(Math.random()*2000)),
+        'Pallets Out': String(500+Math.floor(Math.random()*1500)),
+        'Handling IN': String(8000+Math.floor(Math.random()*12000)),
+        'Handling Out': String(3000+Math.floor(Math.random()*8000)),
+        'Pick & Pack': String(20000+Math.floor(Math.random()*50000)),
+        'Over Time': String(Math.floor(Math.random()*6000)),
+        'Manag. Fees': '1500',
+        'Total price (AED)': String(60000+Math.floor(Math.random()*120000))
+    }));
+
+    DATA.waitingCharges = months.slice(0,48).map(m => ({
+        'Month&Year': m, 'KSA': String(Math.floor(Math.random()*8000)),
+        'OMAN': String(Math.floor(Math.random()*2000)), 'UAE': String(Math.floor(Math.random()*3000)),
+        'Bahrain': String(Math.floor(Math.random()*1000)), 'Kuwait': String(Math.floor(Math.random()*4000)),
+        'Qatar': String(Math.floor(Math.random()*1500)), 'Jordan': String(Math.floor(Math.random()*500)),
+        'Total': String(Math.floor(Math.random()*15000))
+    }));
+
+    DATA.weeklyOrders = [
+        {Month:'Oct-25',Week:'W-1','No of Orders':'55','Order in Cases':'24655','Shipped Cases':'29421'},
+        {Month:'Oct-25',Week:'W-2','No of Orders':'44','Order in Cases':'38004','Shipped Cases':'21571'},
+        {Month:'Oct-25',Week:'W-3','No of Orders':'111','Order in Cases':'48854','Shipped Cases':'10391'},
+        {Month:'Oct-25',Week:'W-4','No of Orders':'89','Order in Cases':'38474','Shipped Cases':'63017'}
+    ];
+
+    DATA.damages = [
+        {Month:'Jan-25','Site Name':'Green Planet Industries LLC','GRN Qty in Cases':'33782','Damaged / Short Units Qty in cases':'18',Percentage:'0.74%'},
+        {Month:'Jan-25','Site Name':'Gulf Centre for Soap','GRN Qty in Cases':'32616','Damaged / Short Units Qty in cases':'1',Percentage:'0.09%'},
+        {Month:'Feb-25','Site Name':'Green Planet Industries LLC','GRN Qty in Cases':'28500','Damaged / Short Units Qty in cases':'12',Percentage:'0.42%'},
+        {Month:'Feb-25','Site Name':'SCITRA','GRN Qty in Cases':'15000','Damaged / Short Units Qty in cases':'3',Percentage:'0.20%'}
+    ];
+
+    DATA.manualOrders = months.slice(12,40).map(m => ({
+        'Month&Year': m, 'Total # Orders': String(200+Math.floor(Math.random()*200)),
+        "API's Order": String(180+Math.floor(Math.random()*150)),
+        'Manual Orders': String(10+Math.floor(Math.random()*60)),
+        '%': (5+Math.random()*15).toFixed(1)+'%'
+    }));
+
+    DATA.palletAging = ['Jun-23','Jul-23','Aug-23','Sep-23','Oct-23','Nov-23','Dec-23','Jan-24','Feb-24','Mar-24','Apr-24','May-24'].map(m => ({
+        'Month': m,
+        'No of Days between 0 to 30': String(800+Math.floor(Math.random()*600)),
+        'No of Days between 31 to 60': String(300+Math.floor(Math.random()*300)),
+        'No of Days between 61 to 90': String(100+Math.floor(Math.random()*200)),
+        'No of Days between 91 to 120': String(50+Math.floor(Math.random()*100)),
+        'No of Days between 121 to 150': String(30+Math.floor(Math.random()*60)),
+        'No of Days between 151 to 180': String(10+Math.floor(Math.random()*40)),
+        'No of Days between 181 to 210': String(5+Math.floor(Math.random()*30)),
+        'No of Days between 211 to 552': String(10+Math.floor(Math.random()*50))
+    }));
+
+    DATA.inboundFlow = [];
+    ['Jan-23','Feb-23','Mar-23','Apr-23','May-23','Jun-23'].forEach(m => {
+        [1,2,3,4].forEach(w => {
+            DATA.inboundFlow.push({Month:m,'Week No.':String(w),Cases:String(5000+Math.floor(Math.random()*25000)),Pallets:String(50+Math.floor(Math.random()*500))});
+        });
+    });
+
+    DATA.tempReport = [];
+    for(let d=1;d<=31;d++){
+        const max=24+Math.random()*5, min=22+Math.random()*3;
+        DATA.tempReport.push({Date:`${d}-1-2025`,'Max. temperature':max.toFixed(1),'Min. temperature':min.toFixed(1),Average:((max+min)/2).toFixed(2)});
+    }
+
+    DATA.subjects = [
+        {MonthYear:'Aug-24',Description:'One CDA should be as per Equipment & Market','Responsible Person':'Behzad / Priyesh',Status:'Open',Action:'TLB Master Implementation'},
+        {MonthYear:'Aug-24',Description:'Trucks Tracking System','Responsible Person':'Behzad / Priyesh',Status:'Open',Action:'Integration pending'},
+        {MonthYear:'Aug-24',Description:'Automated Reconciliation Process','Responsible Person':'Priyesh / Behzad',Status:'Open',Action:'Under Development'}
+    ];
+
+    DATA.qualityIssues = [
+        {Month:'Aug-25',Issues:'Damage cartons',SKU:'18000995','Vendor Name':'Green Planet Industries LLC',Description:'ANTI DAND. SHAMPOO 400ML',Cases:'1',Status:''},
+        {Month:'Aug-25',Issues:'Damage cartons',SKU:'18001869','Vendor Name':'Green Planet Industries LLC',Description:'ANTI HAIR FALL SHAMPOO 400ML',Cases:'1',Status:''},
+        {Month:'Aug-25',Issues:'Shortage',SKU:'18002533','Vendor Name':'Green Planet Industries LLC',Description:'NOURISHING SKIN CREAM 250ML',Cases:'1',Status:''}
+    ];
+
+    DATA.whDamages = [
+        {Month:'Jan-25',Description:'INT MOISTURISING CREAM 150MLX2','Total Quantity':'2',Vendor:'GPI',Remarks:'WH - Handling Damage'},
+        {Month:'Jan-25',Description:'BLACKHEAD CLRNG WALNUT F WASH 150ML','Total Quantity':'1',Vendor:'GPI',Remarks:'WH - Handling Damage'}
+    ];
+
+    DATA.customerComplaints = [
+        {Date:'11-02-2022','Customer Name':'Alphamed','Description':'GENTLE BABY BATH 400 ML','DO Qty':'9','Physical Rec Qty':'0',Differents:'-9','Complaint Type':'Item Interchange',Staus:'Closed'},
+        {Date:'02-03-2022','Customer Name':'Jeddah','Description':'Softness & Shine Shampoo','DO Qty':'125','Physical Rec Qty':'122',Differents:'-3','Complaint Type':'Shortage',Staus:'Closed'}
+    ];
+
+    DATA.overtime = [
+        {' Date ':'29-11-2025',' Hrs ':'10',' Amount ':'1750',' Activity ':'Outbound'},
+        {' Date ':'17-11-2025',' Hrs ':'4',' Amount ':'700',' Activity ':'Inbound/Outbound'},
+        {' Date ':'30-11-2025',' Hrs ':'10',' Amount ':'1750',' Activity ':'Inbound/Outbound'}
+    ];
+
+    DATA.invoiceSummary = [
+        {Month:'Jan-25','DESCRIPTION OF GOODS / SERVICES':'Warehouse Storage Charges','GCC & NA':'81248',Turkey:'8102','South Africa':'21549','Russia FZCO':'19770'},
+        {Month:'Jan-25','DESCRIPTION OF GOODS / SERVICES':'Warehouse Handling In Charges','GCC & NA':'5142',Turkey:'90','South Africa':'312','Russia FZCO':'264'}
+    ];
+
+    DATA.copackingWeekly = [
+        {Month:'Sep-25',Week:'W-1','No.of Orders':'0','No.of Cases':'0'},
+        {Month:'Sep-25',Week:'W-2','No.of Orders':'3','No.of Cases':'2426'},
+        {Month:'Sep-25',Week:'W-3','No.of Orders':'19','No.of Cases':'7750'},
+        {Month:'Sep-25',Week:'W-4','No.of Orders':'15','No.of Cases':'3261'}
+    ];
+
+    DATA.hubInbound = [
+        {'Vendor Name':'Green Planet Industries LLC',Hub:'GCC & NA',Pallets:'197',Cases:'16613',Date:'Jan-23'},
+        {'Vendor Name':'Beauty and Perfume International',Hub:'GCC & NA',Pallets:'18',Cases:'1870',Date:'Jan-23'},
+        {'Vendor Name':'Gulf Centre for Soap',Hub:'GCC & NA',Pallets:'130',Cases:'12174',Date:'Jan-23'},
+        {'Vendor Name':'SCITRA',Hub:'GCC & NA',Pallets:'80',Cases:'5297',Date:'Jan-23'}
+    ];
+
+    DATA.copackingOrders = [
+        {Month:'Sep-25','Client Order No':'CDA0207668','Customer Name':'Himalaya Co Packer','SKU No':'18000386',Description:'MOIST. BABY SOAP WITH ALOE 125GM',Cases:'115',Remarks:'Below 150 Cases'},
+        {Month:'Sep-25','Client Order No':'CDA0206604','Customer Name':'Himalaya Co Packer','SKU No':'18000701',Description:'OLIVE EXTRA NOURISHING CREAM 150ML',Cases:'15',Remarks:'Below 150 Cases'}
+    ];
+
+    DATA.coPacking = [
+        {'Month Name':'Jan-24','Short Text':'SMOOTH & SILKY MOIST SHAMPOO 400ML','Production Qty (Cases)':'200','Total Amount':'276.00',Remarks:'SHRINK'},
+        {'Month Name':'Jan-24','Short Text':'VOL. & THICKNESS SHAM 400ML','Production Qty (Cases)':'583','Total Amount':'804.54',Remarks:'SHRINK'}
+    ];
+
+    DATA.inbGrnMonthly = [
+        {Year:'2024','Month-Year':'Jan-24',Week:'WK1','GRN Cases':'6506','Planned cases':'20279','Percentage (GRN)':'8%'},
+        {Year:'2024','Month-Year':'Jan-24',Week:'WK2','GRN Cases':'22079','Planned cases':'31578','Percentage (GRN)':'26%'},
+        {Year:'2024','Month-Year':'Jan-24',Week:'WK3','GRN Cases':'8763','Planned cases':'54847','Percentage (GRN)':'10%'},
+        {Year:'2024','Month-Year':'Jan-24',Week:'WK4','GRN Cases':'15555','Planned cases':'101225','Percentage (GRN)':'18%'}
+    ];
+
+    DATA.expiredStock = [
+        {No:'18001008',Description:'PURIFYING NEEM SCRUB 150ML','MFD Date':'1-1-2021','Expiry Date':'30-12-2023','Pack Size':'24','Sum of Total Quantity':'1','Month Name':'Jan-24'},
+        {No:'18001513',Description:'INT MOIST COC. BUT. LIPBALM 4.5g','MFD Date':'5-1-2021','Expiry Date':'5-1-2024','Pack Size':'24','Sum of Total Quantity':'58','Month Name':'Jan-24'}
+    ];
+
+    DATA.inboundIssues = [
+        {Date:'19-02-2022','Vendor Name':'SCITRA','ASN No':'ASN/96','Description':'SPARKLY WHITE TOOTHPASTE','ASN Qty':'230','Physical Rec Qty':'60',Differents:'-170',Remarks:'ASN Qty mismatch',Status:'Closed'}
+    ];
+
+    DATA.hubOutbound = [
+        {'Row Labels':'Alphamed General Trading LLC','Month Name':'Jul-24','GCC & NA':'27796',LATVIA:'111','SA & E AFRICA':'51'},
+        {'Row Labels':'Arabian Trading Supplies','Month Name':'Jul-24','GCC & NA':'18699',LATVIA:'700','SA & E AFRICA':'100'}
+    ];
+
+    DATA.storeDet = months.slice(0,48).map((m,i) => ({
+        Year: m.split('-')[1] < '23' ? '2022' : (m.split('-')[1] < '24' ? '2023' : '2024'),
+        Month: m.split('-')[0],
+        SEA: String(200+Math.floor(Math.random()*6000)),
+        LATVIA: String(500+Math.floor(Math.random()*28000)),
+        HUSA: String(Math.floor(Math.random()*600)),
+        METAP: String(20000+Math.floor(Math.random()*90000)),
+        TURKEY: String(Math.floor(Math.random()*15000)),
+        EUROPE: String(Math.floor(Math.random()*5000))
+    }));
+
+    DATA2 = DATA2 || {};
+    DATA2.freights = [
+        {'Total Cases':'12070','Total Trucks':'18','Total Freight':'8090','Total Pallets':'190',Country:'UAE',Month:'Jan-21','Shipment Type':'Road',Equipment:'13.5 MTR Box Truck','Pallet Load Ability %':'41%','Cases Load Ability %':'43%','Freight Per Case':'0.67'},
+        {'Total Cases':'3320','Total Trucks':'2','Total Freight':'2900','Total Pallets':'50',Country:'Oman',Month:'Jan-21','Shipment Type':'Road',Equipment:'Trailer 12.5 MTR','Pallet Load Ability %':'104%','Cases Load Ability %':'115%','Freight Per Case':'0.87'},
+        {'Total Cases':'2392','Total Trucks':'1','Total Freight':'3300','Total Pallets':'25',Country:'KSA',Month:'Jan-21','Shipment Type':'Road',Equipment:'13.5 MTR Reefer Truck','Pallet Load Ability %':'96%','Cases Load Ability %':'153%','Freight Per Case':'1.38'}
+    ];
+
+    DATA2.outboundCases = [
+        {Year:'2022','Site ':'Alphamed General Trading LLC',January:'11465',February:'23937',March:'27889',Total:'328497','%':'18.39%'},
+        {Year:'2022','Site ':'Transatlantic Almaty LTD',January:'0',February:'0',March:'0',Total:'256468','%':'14.36%'},
+        {Year:'2022','Site ':'Arabian Trading Supplies – Riyadh',January:'8626',February:'8443',March:'13204',Total:'141887','%':'7.94%'}
+    ];
+
+    DATA2.trucksContainers = [
+        {Year:'2022','Site ':'Alphamed General Trading LLC',January:'11',February:'22',March:'18',Total:'231','%':'20.55%'},
+        {Year:'2022','Site ':'Arabian Trading Supplies – Riyadh',January:'6',February:'6',March:'8',Total:'91','%':'8.10%'}
+    ];
+}
+
+// ==================== UTILITIES ====================
+function num(v) { if (!v || String(v).trim() === '' || String(v).trim() === '-') return 0; return parseFloat(String(v).replace(/[,$\s%]/g,'')) || 0; }
+function filterEmpty(arr, key) { return (arr||[]).filter(r => r[key] && String(r[key]).trim() !== '' && String(r[key]).trim() !== '-'); }
+function hasAnyNum(r, keys) { return keys.some(k => num(r[k]) > 0); }
+// Smart last-N: take last N items that actually have data in any of the given keys
+function lastN(arr, n, ...keys) {
+    const filtered = keys.length > 0 ? arr.filter(r => hasAnyNum(r, keys)) : arr;
+    return filtered.slice(-n);
+}
+function fmt(n) { if (n >= 1e6) return (n/1e6).toFixed(1)+'M'; if (n >= 1e3) return (n/1e3).toFixed(1)+'K'; return n.toLocaleString(); }
+function fmtN(n) { return n.toLocaleString(); }
+function pct(a,b) { return b ? ((a/b)*100).toFixed(1) : '0'; }
+function last(arr, key) { return arr && arr.length ? arr[arr.length-1][key] : ''; }
+function sumArr(arr, key) { return arr ? arr.reduce((s,r) => s + num(r[key]), 0) : 0; }
+function unique(arr, key) { return [...new Set((arr||[]).map(r => r[key]).filter(Boolean))]; }
+
+const COLORS = {
+    teal: '#006D6B', forest: '#37514F', orange: '#E87722', amber: '#F4A05B',
+    rust: '#C94F1A', green: '#4CAF50', ltTeal: '#C7DEDC', pale: '#EEF6F5',
+    deep: '#1C302F', blue: '#2196F3', purple: '#7B1FA2',
+    set: ['#006D6B','#E87722','#37514F','#F4A05B','#C94F1A','#4CAF50','#2196F3','#7B1FA2','#6E807F','#C7DEDC','#1C302F','#FFC107']
+};
+
+function makeChart(id, config) {
+    const ctx = document.getElementById(id);
+    if (!ctx) return null;
+    if (allCharts[id]) { allCharts[id].destroy(); }
+    config.options = config.options || {};
+    config.options.responsive = true;
+    config.options.maintainAspectRatio = false;
+    config.options.layout = config.options.layout || {};
+    config.options.layout.padding = config.options.layout.padding || {bottom:5,right:10};
+    config.options.plugins = config.options.plugins || {};
+    config.options.plugins.legend = config.options.plugins.legend || {position:'bottom',labels:{font:{family:'Calibri',size:11},boxWidth:12,padding:8}};
+    if (!config.options.scales) config.options.scales = {};
+    if (config.type !== 'doughnut' && config.type !== 'pie') {
+        const xAxis = config.options.scales.x || (config.options.scales.x = {});
+        if (!xAxis.ticks) xAxis.ticks = {};
+        if (xAxis.ticks.maxRotation === undefined) xAxis.ticks.maxRotation = 45;
+        if (xAxis.ticks.autoSkip === undefined) xAxis.ticks.autoSkip = true;
+    }
+    ctx.style.height = config._h || '340px';
+    allCharts[id] = new Chart(ctx, config);
+    return allCharts[id];
+}
+
+function makeCard(label, value, sub, trend, cls) {
+    const trendCls = trend > 0 ? 'up' : (trend < 0 ? 'down' : '');
+    const trendTxt = trend > 0 ? `&#9650; ${trend}%` : (trend < 0 ? `&#9660; ${Math.abs(trend)}%` : '');
+    return `<div class="card ${cls||''}" onclick="drillDown('${label}')">
+        <div class="card-label">${label}</div>
+        <div class="card-value">${value}</div>
+        <div class="card-sub">${sub||''}</div>
+        ${trendTxt ? `<div class="card-trend ${trendCls}">${trendTxt}</div>` : ''}
+    </div>`;
+}
+
+function drillDown(label) {
+    const map = {
+        'Total Inbound':'warehouse','Inbound Cases':'warehouse','Total Outbound':'warehouse','Outbound Cases':'warehouse',
+        'Closing Stock':'inventory','Current Stock':'inventory','Pallet Days':'inventory','Storage':'inventory',
+        'Quality Issues':'quality','Damage Rate':'quality','Complaints':'quality','WH Damages':'quality',
+        'Total Cost':'cost','Cost/Pallet':'cost','Overtime':'cost','Mgmt Fees':'cost',
+        'Total Freight':'freight','Trucks':'freight','Load Ability':'freight','Waiting Charges':'freight',
+        'Total Orders':'orders','Manual Orders':'orders','Shipped Cases':'orders',
+        'Co-Pack Orders':'copacking','Co-Pack Volume':'copacking',
+        'Avg Temperature':'environment','Max Temperature':'environment'
+    };
+    const tab = map[label];
+    if (tab) switchTab(tab);
+}
+
+// ==================== TAB NAVIGATION ====================
+const renderedTabs = new Set();
+function switchTab(tabId) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
+    document.getElementById('page-'+tabId).classList.add('active');
+    document.querySelector(`.nav button[data-tab="${tabId}"]`).classList.add('active');
+    // Lazy-render: create charts only when tab first becomes visible
+    if (!renderedTabs.has(tabId)) {
+        renderedTabs.add(tabId);
+        requestAnimationFrame(() => renderTab(tabId));
+    }
+}
+function renderTab(tabId) {
+    const map = {
+        warehouse: renderWarehouse,
+        inventory: renderInventory,
+        quality: renderQuality,
+        cost: renderCost,
+        freight: renderFreight,
+        orders: renderOrders,
+        copacking: renderCoPacking,
+        environment: renderEnvironment
+    };
+    if (map[tabId]) map[tabId]();
+}
+
+document.getElementById('navBar').addEventListener('click', e => {
+    if (e.target.tagName === 'BUTTON' && e.target.dataset.tab) switchTab(e.target.dataset.tab);
+});
+
+// ==================== INIT DASHBOARD ====================
+function initDashboard() {
+    populateFilters();
+    renderExecutive();
+    renderedTabs.add('executive');
+}
+
+function autoSelectLatestMonth() {
+    // Find latest month from stockFlow that has actual Inbound/Outbound data
+    // stockFlow drives the executive view, so it's the primary reference
+    const MONTH_ORDER = {Jan:1,Feb:2,Mar:3,Apr:4,May:5,Jun:6,Jul:7,Aug:8,Sep:9,Oct:10,Nov:11,Dec:12};
+    let bestYear = 0, bestMonIdx = 0, bestMon = '';
+
+    (DATA.stockFlow||[]).forEach(r => {
+        if (!r.Month) return;
+        // Only rows with actual numeric data
+        if (!(num(r.Inbound) > 0 || num(r.Outbound) > 0 || num(r['Closing Stock']) > 0)) return;
+        const m = String(r.Month).match(/^([A-Z][a-z]{2})-(\d{2})$/);
+        if (!m) return;
+        const yr = 2000 + parseInt(m[2]);
+        const mi = MONTH_ORDER[m[1]] || 0;
+        if (yr > bestYear || (yr === bestYear && mi > bestMonIdx)) {
+            bestYear = yr; bestMonIdx = mi; bestMon = m[1];
+        }
+    });
+
+    if (bestMon && bestYear) {
+        document.getElementById('globalMonth').value = bestMon;
+        document.getElementById('globalYear').value = String(bestYear);
+    }
+}
+
+function populateFilters() {
+    const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    // Collect all years from all datasets that have month-based date fields
+    const allDates = [];
+    const dateKeyMap = {stockFlow:'Month',costingDet:'Month-Year',waitingCharges:'Month&Year',
+        damages:'Month',qualityIssues:'Month',manualOrders:'Month&Year',invoiceSummary:'Month',
+        freights:'Month',palletAging:'Month',inboundFlow:'Month',
+        hubInbound:'Date',hubOutbound:'Month Name',storage:'Month',coPacking:'Month Name',
+        copackingOrders:'Month',copackingWeekly:'Month',whDamages:'Month',weeklyOrders:'Month',
+        expiredStock:'Month Name',inbGrnMonthly:'Month-Year',ytdTrends:'Month',fzeSkuGw:'Year - Month'};
+    for (const [ds, key] of Object.entries(dateKeyMap)) {
+        if (DATA[ds]) DATA[ds].forEach(r => { if (r[key]) allDates.push(String(r[key])); });
+    }
+    const years = [...new Set(allDates.map(d => {
+        const parts = d.split('-');
+        if (parts.length === 2 && parts[1].length === 2) return '20' + parts[1];
+        return null;
+    }).filter(Boolean))].sort();
+
+    const gm = document.getElementById('globalMonth');
+    const gy = document.getElementById('globalYear');
+    gm.innerHTML = '<option value="all">All Months</option>';
+    gy.innerHTML = '<option value="all">All Years</option>';
+    MONTH_NAMES.forEach(m => { const o = document.createElement('option'); o.value = m; o.text = m; gm.appendChild(o); });
+    years.forEach(y => { const o = document.createElement('option'); o.value = y; o.text = y; gy.appendChild(o); });
+
+    const wy = document.getElementById('whYear');
+    if (wy) { wy.innerHTML = '<option value="all">All</option>'; years.forEach(y => { const o = document.createElement('option'); o.value = y; o.text = y; wy.appendChild(o); }); }
+}
+
+// Global filter: returns a filter function that checks Mon-YY date fields
+function getGlobalFilter() {
+    const m = document.getElementById('globalMonth').value;
+    const y = document.getElementById('globalYear').value;
+    if (m === 'all' && y === 'all') return null;
+    const MONTH_ABBR = {Jan:'1',Feb:'2',Mar:'3',Apr:'4',May:'5',Jun:'6',Jul:'7',Aug:'8',Sep:'9',Oct:'10',Nov:'11',Dec:'12'};
+    const MONTH_NUM_TO_ABBR = {'1':'Jan','2':'Feb','3':'Mar','4':'Apr','5':'May','6':'Jun','7':'Jul','8':'Aug','9':'Sep','10':'Oct','11':'Nov','12':'Dec','01':'Jan','02':'Feb','03':'Mar','04':'Apr','05':'May','06':'Jun','07':'Jul','08':'Aug','09':'Sep'};
+    return function(dateStr) {
+        if (!dateStr) return false;
+        const s = String(dateStr).trim();
+        let mon = null, yr = null;
+        if (/^[A-Za-z]{3,}-\d{2}$/.test(s)) {
+            // Mon-YY format (e.g. "Jan-22")
+            const p = s.split('-');
+            mon = p[0]; yr = '20' + p[1];
+        } else if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(s)) {
+            // DD-MM-YYYY format
+            const p = s.split('-');
+            mon = MONTH_NUM_TO_ABBR[p[1]] || null; yr = p[2];
+        } else if (/^[A-Za-z]+$/.test(s)) {
+            // Just month name like "January" - match abbreviated
+            mon = s.substring(0,3); yr = null;
+        } else if (/^\d{4}$/.test(s)) {
+            // Just year
+            mon = null; yr = s;
+        } else {
+            return true;
+        }
+        if (m !== 'all' && mon !== m) return false;
+        if (y !== 'all' && yr !== y) return false;
+        return true;
+    };
+}
+
+function applyGlobalFilter() {
+    // Re-render all currently rendered tabs
+    renderedTabs.clear();
+    Object.values(allCharts).forEach(c => { try{c.destroy()}catch(e){} });
+    allCharts = {};
+    document.querySelectorAll('tbody').forEach(tb => tb.innerHTML = '');
+    renderExecutive();
+    renderedTabs.add('executive');
+    // Re-render whichever tab is currently active
+    const activeTab = document.querySelector('.nav button.active');
+    if (activeTab) {
+        const tabId = activeTab.dataset.tab;
+        if (tabId !== 'executive') {
+            renderTab(tabId);
+            renderedTabs.add(tabId);
+        }
+    }
+}
+
+function resetGlobalFilter() {
+    document.getElementById('globalMonth').value = 'all';
+    document.getElementById('globalYear').value = 'all';
+    applyGlobalFilter();
+}
+
+// Apply global month/year filter to an array given its date key
+function gf(arr, dateKey) {
+    const filt = getGlobalFilter();
+    if (!filt) return arr || [];
+    return (arr || []).filter(r => filt(r[dateKey]));
+}
+
+// ==================== EXECUTIVE OVERVIEW ====================
+function renderExecutive() {
+    const sfRaw = gf(DATA.stockFlow, 'Month');
+    const sf = sfRaw.filter(r => r.Inbound && String(r.Inbound).trim() !== '' && num(r.Inbound) > 0);
+    const cd = gf(DATA.costingDet, 'Month-Year').filter(r => r['Total price (AED)'] && num(r['Total price (AED)']) > 0);
+    const wc = gf(DATA.waitingCharges, 'Month&Year').filter(r => num(r.Total) > 0);
+    const qi = gf(DATA.qualityIssues, 'Month');
+
+    const latest = sf[sf.length-1] || {};
+    const prev = sf[sf.length-2] || {};
+    const latestCost = cd[cd.length-1] || {};
+    const prevCost = cd[cd.length-2] || {};
+
+    const inbTrend = prev.Inbound ? ((num(latest.Inbound)-num(prev.Inbound))/num(prev.Inbound)*100).toFixed(1) : 0;
+    const outTrend = prev.Outbound ? ((num(latest.Outbound)-num(prev.Outbound))/num(prev.Outbound)*100).toFixed(1) : 0;
+    const costTrend = prevCost['Total price (AED)'] ? ((num(latestCost['Total price (AED)'])-num(prevCost['Total price (AED)']))/num(prevCost['Total price (AED)'])*100).toFixed(1) : 0;
+
+    // Update insight with actual data range
+    const gfilt = getGlobalFilter();
+    const firstMonth = sf.length > 0 ? sf[0].Month : '';
+    const lastMonth = latest.Month || '';
+    if (sf.length === 0 && gfilt) {
+        const m = document.getElementById('globalMonth').value;
+        const y = document.getElementById('globalYear').value;
+        document.getElementById('execInsight').textContent = `No stock flow data found for ${m !== 'all' ? m : ''} ${y !== 'all' ? y : ''}. Try a different filter or click Reset.`;
+    } else if (firstMonth === lastMonth) {
+        document.getElementById('execInsight').textContent = `Showing data for ${lastMonth}. Click any KPI card below to drill down into detailed operational views.`;
+    } else {
+        document.getElementById('execInsight').textContent = `Dashboard loaded with data from ${firstMonth} to ${lastMonth}. Click any KPI card below to drill down into detailed operational views.`;
+    }
+
+    document.getElementById('execCards').innerHTML =
+        makeCard('Inbound Cases', fmt(num(latest.Inbound)), latest.Month || 'Latest', parseFloat(inbTrend), 'clickable') +
+        makeCard('Outbound Cases', fmt(num(latest.Outbound)), latest.Month || 'Latest', parseFloat(outTrend), 'clickable') +
+        makeCard('Closing Stock', fmt(num(latest['Closing Stock'])), 'Units in warehouse', null, 'clickable') +
+        makeCard('Total Cost', fmt(num(latestCost['Total price (AED)'])) + ' AED', latestCost['Month-Year'] || '', parseFloat(costTrend), 'clickable orange') +
+        makeCard('Quality Issues', String(qi.length), 'Total logged issues', null, 'clickable') +
+        makeCard('Waiting Charges', fmt(sumArr(wc.slice(-3), 'Total')) + ' AED', 'Last 3 months', null, 'clickable orange');
+
+    // Stock Flow Chart
+    const sfChart = lastN(sf, 24, 'Inbound', 'Outbound');
+    const sfLabels = sfChart.map(r => r.Month);
+    makeChart('chartStockFlow', {
+        type: 'line',
+        data: {
+            labels: sfLabels,
+            datasets: [
+                {label:'Opening Stock',data:sfChart.map(r=>num(r['Opening Stock'])),borderColor:COLORS.teal,backgroundColor:COLORS.teal+'20',fill:true,tension:.3},
+                {label:'Closing Stock',data:sfChart.map(r=>num(r['Closing Stock'])),borderColor:COLORS.orange,backgroundColor:COLORS.orange+'20',fill:true,tension:.3}
+            ]
+        },
+        options:{scales:{y:{beginAtZero:false,ticks:{callback:v=>fmt(v),font:{family:'Calibri'}}},x:{ticks:{font:{family:'Calibri'},maxRotation:45}}}}
+    });
+
+    // Inbound vs Outbound
+    makeChart('chartInbOutb', {
+        type: 'bar',
+        data: {
+            labels: sfLabels,
+            datasets: [
+                {label:'Inbound',data:sfChart.map(r=>num(r.Inbound)),backgroundColor:COLORS.teal},
+                {label:'Outbound',data:sfChart.map(r=>num(r.Outbound)),backgroundColor:COLORS.orange}
+            ]
+        },
+        options:{scales:{y:{ticks:{callback:v=>fmt(v)}},x:{ticks:{maxRotation:45}}}}
+    });
+
+    // Cost Trend
+    const cdSlice = lastN(cd, 24, 'Total price (AED)');
+    makeChart('chartCostTrend', {
+        type: 'line',
+        data: {
+            labels: cdSlice.map(r=>r['Month-Year']),
+            datasets: [{label:'Total Cost (AED)',data:cdSlice.map(r=>num(r['Total price (AED)'])),borderColor:COLORS.rust,backgroundColor:COLORS.rust+'15',fill:true,tension:.3,pointRadius:2}]
+        },
+        options:{scales:{y:{ticks:{callback:v=>fmt(v)}}}}
+    });
+
+    // Waiting Charges
+    const wcSlice = lastN(wc, 15, 'Total');
+    const countries = ['KSA','OMAN','UAE','Bahrain','Kuwait','Qatar','Jordan'];
+    makeChart('chartWaiting', {
+        type: 'bar',
+        data: {
+            labels: wcSlice.map(r=>r['Month&Year']),
+            datasets: countries.map((c,i) => ({
+                label: c,
+                data: wcSlice.map(r => num(r[c])),
+                backgroundColor: COLORS.set[i]
+            }))
+        },
+        options:{scales:{x:{stacked:true,ticks:{maxRotation:45}},y:{stacked:true,ticks:{callback:v=>fmt(v)}}}}
+    });
+
+    // YTD Trends Charts
+    const ytd = gf(DATA.ytdTrends || [], 'Month');
+    if (ytd.length > 0) {
+        const ytdMonths = [...new Set(ytd.map(r => r.Month))];
+        const getYtdVal = (month, desc) => { const r = ytd.find(x => x.Month === month && x.Description === desc); return r ? num(r.Value) : 0; };
+        makeChart('chartYtdStock', {
+            type: 'line',
+            data: {
+                labels: ytdMonths,
+                datasets: [
+                    {label:'Opening Stock',data:ytdMonths.map(m=>getYtdVal(m,'Opening Stock')),borderColor:COLORS.teal,backgroundColor:COLORS.teal+'20',fill:true,tension:.3},
+                    {label:'Closing Stock',data:ytdMonths.map(m=>getYtdVal(m,'Closing Stock')),borderColor:COLORS.orange,backgroundColor:COLORS.orange+'20',fill:true,tension:.3}
+                ]
+            },
+            options:{scales:{y:{beginAtZero:false,ticks:{callback:v=>fmt(v)}},x:{ticks:{maxRotation:45}}}}
+        });
+        makeChart('chartYtdInbOut', {
+            type: 'bar',
+            data: {
+                labels: ytdMonths,
+                datasets: [
+                    {label:'Inbound Cases',data:ytdMonths.map(m=>getYtdVal(m,'Inbound Cases')),backgroundColor:COLORS.teal},
+                    {label:'Outbound Cases',data:ytdMonths.map(m=>getYtdVal(m,'Outbound Cases')),backgroundColor:COLORS.orange}
+                ]
+            },
+            options:{scales:{y:{ticks:{callback:v=>fmt(v)}},x:{ticks:{maxRotation:45}}}}
+        });
+    }
+
+    // Subjects Table
+    const tbody = document.querySelector('#tblSubjects tbody');
+    gf(DATA.subjects||[], 'MonthYear').slice(0,20).forEach(r => {
+        const statusPill = r.Status === 'Closed' ? '<span class="pill green">Closed</span>' : '<span class="pill orange">Open</span>';
+        tbody.innerHTML += `<tr><td>${r.MonthYear||''}</td><td>${r.Description||''}</td><td>${r['Responsible Person']||''}</td><td>${statusPill}</td><td>${r.Action||''}</td></tr>`;
+    });
+}
+
+// ==================== WAREHOUSE OPERATIONS ====================
+function populateWhFilters() {
+    const whS = document.getElementById('whSite');
+    const savedS = whS.value;
+
+    const sites = new Set();
+    (DATA.hubInbound||[]).forEach(r => { if (r['Vendor Name']) sites.add(r['Vendor Name']); });
+    (DATA.damages||[]).forEach(r => { if (r['Site Name']) sites.add(r['Site Name']); });
+    (DATA.truckTurnover||[]).forEach(r => { if (r.Site) sites.add(r.Site); });
+
+    whS.innerHTML = '<option value="all">All Sites</option>';
+    [...sites].sort().forEach(s => { const o = document.createElement('option'); o.value = s; o.text = s.length > 35 ? s.substring(0,35)+'...' : s; whS.appendChild(o); });
+
+    if ([...whS.options].some(o => o.value === savedS)) whS.value = savedS;
+}
+
+function getWhFilter() {
+    return { site: document.getElementById('whSite').value };
+}
+
+function whFilterArr(arr, dateKey, siteKey) {
+    const {site} = getWhFilter();
+    let result = gf(arr, dateKey);
+    if (site !== 'all' && siteKey) {
+        result = result.filter(r => String(r[siteKey]||'') === site);
+    }
+    return result;
+}
+
+function reRenderWarehouse() {
+    renderedTabs.delete('warehouse');
+    ['chartInbFlow','chartPlanGrn','chartHubInb','chartTruckTurn','chartInbSummSite','chartTruckSite'].forEach(id => {
+        if (allCharts[id]) { allCharts[id].destroy(); delete allCharts[id]; }
+    });
+    ['#tblInbIssues tbody','#tblInbDetail tbody'].forEach(sel => {
+        const tb = document.querySelector(sel);
+        if (tb) tb.innerHTML = '';
+    });
+    renderWarehouse();
+    renderedTabs.add('warehouse');
+}
+
+function resetWhFilter() {
+    document.getElementById('whSite').value = 'all';
+    reRenderWarehouse();
+}
+
+function renderWarehouse() {
+    populateWhFilters();
+    const {site} = getWhFilter();
+
+    const sf = whFilterArr(DATA.stockFlow, 'Month').filter(r => num(r.Inbound) > 0 || num(r.Outbound) > 0);
+    const inbFlow = whFilterArr(DATA.inboundFlow, 'Month').filter(r => num(r.Cases) > 0);
+    const grnM = whFilterArr(DATA.inbGrnMonthly, 'Month-Year').filter(r => num(r['GRN Cases']) > 0 || num(r['Planned cases']) > 0);
+    const hi = whFilterArr(DATA.hubInbound, 'Date', 'Vendor Name');
+    const latest = sf[sf.length-1] || {};
+
+    const totalInb = sumArr(sf, 'Inbound');
+    const totalOut = sumArr(sf, 'Outbound');
+    const periodLabel = sf.length <= 12 ? 'Filtered period' : 'All periods';
+
+    document.getElementById('whCards').innerHTML =
+        makeCard('Total Inbound', fmt(totalInb), periodLabel + ' (cases)') +
+        makeCard('Total Outbound', fmt(totalOut), periodLabel + ' (cases)') +
+        makeCard('Current Stock', fmt(num(latest['Closing Stock'])), latest.Month || '-') +
+        makeCard('Inbound Issues', String(whFilterArr(DATA.inboundIssues, 'Date').length), 'Total logged');
+
+    // Inbound Flow
+    const flowSlice = lastN(inbFlow, 24, 'Cases');
+    makeChart('chartInbFlow', {
+        type: 'bar',
+        data: {
+            labels: flowSlice.map(r => `W${r['Week No.']}`),
+            datasets: [
+                {label:'Cases',data:flowSlice.map(r=>num(r.Cases)),backgroundColor:COLORS.teal,yAxisID:'y'},
+                {label:'Pallets',data:flowSlice.map(r=>num(r.Pallets)),type:'line',borderColor:COLORS.orange,backgroundColor:'transparent',yAxisID:'y1',tension:.3}
+            ]
+        },
+        options:{scales:{y:{position:'left',ticks:{callback:v=>fmt(v)}},y1:{position:'right',grid:{drawOnChartArea:false}},x:{ticks:{maxRotation:45,font:{size:10}}}}}
+    });
+
+    // Plan vs GRN
+    const grnSlice = lastN(grnM, 20, 'GRN Cases', 'Planned cases');
+    makeChart('chartPlanGrn', {
+        type: 'bar',
+        data: {
+            labels: grnSlice.map(r => r.Week || r['Month-Year']),
+            datasets: [
+                {label:'GRN Cases',data:grnSlice.map(r=>num(r['GRN Cases'])),backgroundColor:COLORS.teal},
+                {label:'Planned Cases',data:grnSlice.map(r=>num(r['Planned cases'])),backgroundColor:COLORS.amber+'80'}
+            ]
+        },
+        options:{scales:{y:{ticks:{callback:v=>fmt(v)}},x:{ticks:{maxRotation:45,font:{size:10}}}}}
+    });
+
+    // Hub Inbound
+    const hubAgg = {};
+    hi.forEach(r => { const v = r['Vendor Name']||''; hubAgg[v] = (hubAgg[v]||0) + num(r.Cases); });
+    const hubSorted = Object.entries(hubAgg).sort((a,b)=>b[1]-a[1]).slice(0,8);
+    makeChart('chartHubInb', {
+        type: 'doughnut',
+        data: {
+            labels: hubSorted.map(h=>h[0].substring(0,30)),
+            datasets: [{data:hubSorted.map(h=>h[1]),backgroundColor:COLORS.set}]
+        },
+        options:{plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:10,padding:5}}}},
+        _h:'420px'
+    });
+
+    // Truck Turnaround (histogram-like) from real Truck Turnover Time data
+    const turnBuckets = {'< 1h':0,'1-2h':0,'2-3h':0,'3-4h':0,'4-5h':0,'> 5h':0};
+    const ttRaw = DATA.truckTurnover || [];
+    const ttFiltered = whFilterArr(ttRaw, 'Month', 'Site');
+    ttFiltered.forEach(r => {
+        const t = r['Turnover Time'] || '';
+        const parts = t.split(':');
+        if (parts.length >= 2) {
+            const hrs = parseInt(parts[0]);
+            if (hrs < 1) turnBuckets['< 1h']++;
+            else if (hrs < 2) turnBuckets['1-2h']++;
+            else if (hrs < 3) turnBuckets['2-3h']++;
+            else if (hrs < 4) turnBuckets['3-4h']++;
+            else if (hrs < 5) turnBuckets['4-5h']++;
+            else turnBuckets['> 5h']++;
+        }
+    });
+    makeChart('chartTruckTurn', {
+        type: 'bar',
+        data: {
+            labels: Object.keys(turnBuckets),
+            datasets: [{label:'Trucks',data:Object.values(turnBuckets),backgroundColor:[COLORS.green,COLORS.teal,COLORS.amber,COLORS.orange,COLORS.rust,COLORS.deep]}]
+        },
+        options:{plugins:{legend:{display:false}},scales:{y:{title:{display:true,text:'Number of Trucks'}}}}
+    });
+
+    // Inbound Summary by Site
+    const inbSumm = whFilterArr(DATA.inboundSummary || [], 'Year', 'Site ');
+    const siteAgg = {};
+    inbSumm.filter(r => (r.Type||'').toLowerCase() === 'cases').forEach(r => {
+        const site = (r['Site ']||r.Site||'').substring(0,30);
+        if (!site) return;
+        const total = num(r.Total);
+        siteAgg[site] = (siteAgg[site]||0) + total;
+    });
+    const siteSorted = Object.entries(siteAgg).filter(e=>e[1]>0).sort((a,b)=>b[1]-a[1]).slice(0,10);
+    makeChart('chartInbSummSite', {
+        type: 'bar',
+        data: { labels: siteSorted.map(s=>s[0]), datasets: [{label:'Total Cases',data:siteSorted.map(s=>s[1]),backgroundColor:COLORS.set}] },
+        options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{ticks:{callback:v=>fmt(v)}}}}
+    });
+
+    // Avg Truck Turnover by Site
+    const siteTO = {};
+    ttFiltered.forEach(r => {
+        const site = (r.Site||'').substring(0,25);
+        const t = r['Turnover Time']||'';
+        const parts = t.split(':');
+        if (parts.length >= 2 && site) {
+            const mins = parseInt(parts[0])*60 + parseInt(parts[1]);
+            if (!siteTO[site]) siteTO[site] = [];
+            siteTO[site].push(mins);
+        }
+    });
+    const toSites = Object.entries(siteTO).map(([s,arr])=>([s,(arr.reduce((a,b)=>a+b,0)/arr.length).toFixed(0)])).sort((a,b)=>b[1]-a[1]);
+    makeChart('chartTruckSite', {
+        type: 'bar',
+        data: { labels: toSites.map(s=>s[0]), datasets: [{label:'Avg Minutes',data:toSites.map(s=>Number(s[1])),backgroundColor:COLORS.set}] },
+        options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{title:{display:true,text:'Minutes'}}}}
+    });
+
+    // Inbound Issues Table
+    const iitb = document.querySelector('#tblInbIssues tbody');
+    whFilterArr(DATA.inboundIssues, 'Date').slice(0,30).forEach(r => {
+        iitb.innerHTML += `<tr><td>${r.Date||''}</td><td>${r['Vendor Name']||''}</td><td>${r['ASN No']||''}</td><td>${(r.Description||'').substring(0,40)}</td><td>${r['ASN Qty']||''}</td><td>${r['Physical Rec Qty']||''}</td><td>${r.Differents||''}</td><td>${(r.Remarks||'').substring(0,50)}</td><td><span class="pill ${(r.Status||'').includes('Close')?'green':'orange'}">${r.Status||''}</span></td></tr>`;
+    });
+
+    // Inbound Detail Table (recent GRNs)
+    const idTb = document.querySelector('#tblInbDetail tbody');
+    const inbDet = whFilterArr(DATA.inboundDetail || [], 'Year');
+    inbDet.slice(-50).reverse().forEach(r => {
+        idTb.innerHTML += `<tr><td>${r.Client||''}</td><td>${r['GRN No']||''}</td><td>${(r['Vendor Name']||'').substring(0,25)}</td><td>${(r.Description||'').substring(0,35)}</td><td>${r['SKU No 2']||''}</td><td>${r['Quantity in Cases']||''}</td><td>${r['Created At']||''}</td><td>${r.Year||''}</td></tr>`;
+    });
+}
+
+// ==================== INVENTORY & STORAGE ====================
+function populateInvFilter() {
+    const sel = document.getElementById('invHub');
+    const saved = sel.value;
+    const hubs = new Set();
+    (DATA.storageHub||[]).forEach(r => { if (r.Hub) hubs.add(r.Hub); });
+    sel.innerHTML = '<option value="all">All Hubs</option>';
+    [...hubs].sort().forEach(h => { const o = document.createElement('option'); o.value = h; o.text = h; sel.appendChild(o); });
+    if ([...sel.options].some(o => o.value === saved)) sel.value = saved;
+}
+function getInvHub() { return document.getElementById('invHub').value; }
+function invFilterArr(arr, hubKey) {
+    const h = getInvHub();
+    if (h === 'all') return arr || [];
+    return (arr||[]).filter(r => (r[hubKey]||'') === h);
+}
+function reRenderInventory() {
+    renderedTabs.delete('inventory');
+    ['chartAging','chartStorageHub','chartStorageBand','chartStockMov'].forEach(id => {
+        if (allCharts[id]) { allCharts[id].destroy(); delete allCharts[id]; }
+    });
+    const tb = document.querySelector('#tblExpired tbody');
+    if (tb) tb.innerHTML = '';
+    renderInventory();
+    renderedTabs.add('inventory');
+}
+function resetInvFilter() {
+    document.getElementById('invHub').value = 'all';
+    reRenderInventory();
+}
+
+function renderInventory() {
+    populateInvFilter();
+    const sf = gf(DATA.stockFlow, 'Month').filter(r => num(r['Closing Stock']) > 0);
+    const latest = sf[sf.length-1] || {};
+
+    // Pivot pallet aging from long format (Month, Description, No of Pallets) to wide
+    const paRaw = gf(DATA.palletAging || [], 'Month');
+    const paWide = {};
+    paRaw.forEach(r => {
+        const m = r.Month||'';
+        if (!m) return;
+        if (!paWide[m]) paWide[m] = {Month:m};
+        const desc = r.Description||'';
+        if (desc) paWide[m][desc] = num(r['No of Pallets']);
+    });
+    const pa = Object.values(paWide);
+
+    const latestAging = pa[pa.length-1] || {};
+    const agingBands = ['No of Days between 0 to 30','No of Days between 31 to 60','No of Days between 61 to 90','No of Days between 91 to 120','No of Days between 121 to 150','No of Days between 151 to 180','No of Days between 181 to 210','No of Days between 211 to 552'];
+    const totalPallets0_30 = num(latestAging['No of Days between 0 to 30']);
+    const totalPallets = agingBands.reduce((s,b) => s + num(latestAging[b]), 0);
+    const freshPct = totalPallets ? ((totalPallets0_30/totalPallets)*100).toFixed(0) : 0;
+
+    document.getElementById('invCards').innerHTML =
+        makeCard('Closing Stock', fmt(num(latest['Closing Stock'])), latest.Month) +
+        makeCard('Fresh Pallets (0-30d)', freshPct + '%', `${fmt(totalPallets0_30)} of ${fmt(totalPallets)}`) +
+        makeCard('Expired Items', String((DATA.expiredStock||[]).length), 'Items requiring action') +
+        makeCard('Pallet Days', latestAging.Month || '', 'Latest aging period');
+
+    // Pallet Aging
+    const paSlice = pa.slice(-15);
+    const bandLabels = ['0-30d','31-60d','61-90d','91-120d','121-150d','151-180d','181-210d','211+d'];
+    makeChart('chartAging', {
+        type: 'bar',
+        data: {
+            labels: paSlice.map(r=>r.Month),
+            datasets: agingBands.map((b,i) => ({
+                label: bandLabels[i],
+                data: paSlice.map(r=>num(r[b])),
+                backgroundColor: COLORS.set[i]
+            }))
+        },
+        options:{scales:{x:{stacked:true,ticks:{maxRotation:45}},y:{stacked:true,ticks:{callback:v=>fmt(v)}}}}
+    });
+
+    // Storage by Hub (Year, Hub, Jan-Dec pivot from storageHub)
+    const shRaw = DATA.storageHub || [];
+    const sh = invFilterArr(shRaw, 'Hub').filter(r => r.Year && r.Year !== '#');
+    const shMonths = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const hasShData = sh.length > 0 && sh.some(r => shMonths.some(m => num(r[m]) > 0));
+    if (hasShData) {
+        const hubNames = [...new Set(sh.map(r => r.Hub||''))].filter(Boolean);
+        const shYears = [...new Set(sh.map(r => r.Year||''))].filter(Boolean).sort();
+        const shLabels = []; const shData = {};
+        hubNames.forEach(h => { shData[h] = []; });
+        shYears.forEach(y => {
+            shMonths.forEach(m => {
+                shLabels.push(`${m.substring(0,3)}-${String(y).slice(-2)}`);
+                hubNames.forEach(h => {
+                    const row = sh.find(r => r.Year == y && r.Hub === h);
+                    shData[h].push(row ? num(row[m]) : 0);
+                });
+            });
+        });
+        const shSlice = shLabels.length > 24 ? shLabels.length - 24 : 0;
+        makeChart('chartStorageHub', {
+            type: 'line',
+            data: {
+                labels: shLabels.slice(shSlice),
+                datasets: hubNames.map((h,i) => ({
+                    label: h, data: shData[h].slice(shSlice),
+                    borderColor: COLORS.set[i], backgroundColor: COLORS.set[i]+'15', fill: false, tension: .3, pointRadius: 3, pointHoverRadius: 6, borderWidth: 2
+                }))
+            },
+            options:{scales:{y:{ticks:{callback:v=>fmt(v)}},x:{ticks:{maxRotation:45,font:{size:10}}}}}
+        });
+    } else {
+        const el = document.getElementById('chartStorageHub');
+        if (el) {
+            el.parentElement.innerHTML = '<h3>Storage Pallet-Days by Hub</h3><div style="display:flex;align-items:center;justify-content:center;height:300px;color:var(--muted);font-style:italic">No data — the Excel formulas in the Storage sheet (columns A-N) are returning errors. Please fix the formulas in Excel and re-sync.</div>';
+        }
+    }
+
+    // Storage Profile
+    const st = gf(DATA.storage || [], 'Month');
+    if (st.length > 0) {
+        const latestSt = st[st.length-1];
+        const bands = Object.keys(latestSt).filter(k=>k!=='Month'&&k.includes('No.of'));
+        const bandVals = bands.map(b=>num(latestSt[b]));
+        makeChart('chartStorageBand', {
+            type: 'pie',
+            data: { labels: bands.map(b=>b.replace('No.of Days ','').replace('No.of days ','')), datasets: [{data:bandVals,backgroundColor:COLORS.set}] },
+            options:{plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:10,padding:5}}}},
+            _h:'400px'
+        });
+    } else {
+        makeChart('chartStorageBand', {type:'pie',data:{labels:['1000-2000','2001-2500','2501-3000','3001-3500','3501-4000'],datasets:[{data:[5,22,24,13,4],backgroundColor:COLORS.set}]}});
+    }
+
+    // Stock Movement
+    makeChart('chartStockMov', {
+        type: 'line',
+        data: {
+            labels: lastN(sf, 18, 'Inbound', 'Outbound').map(r=>r.Month),
+            datasets: [
+                {label:'Opening',data:lastN(sf,18,'Inbound','Outbound').map(r=>num(r['Opening Stock'])),borderColor:COLORS.teal,tension:.3,fill:false},
+                {label:'Inbound',data:lastN(sf,18,'Inbound','Outbound').map(r=>num(r.Inbound)),borderColor:COLORS.green,tension:.3,fill:false},
+                {label:'Outbound',data:lastN(sf,18,'Inbound','Outbound').map(r=>num(r.Outbound)),borderColor:COLORS.orange,tension:.3,fill:false},
+                {label:'Closing',data:lastN(sf,18,'Inbound','Outbound').map(r=>num(r['Closing Stock'])),borderColor:COLORS.rust,tension:.3,fill:false}
+            ]
+        },
+        options:{scales:{y:{ticks:{callback:v=>fmt(v)}}}}
+    });
+
+    // Expired Stock Table
+    const exTb = document.querySelector('#tblExpired tbody');
+    const exData = gf(DATA.expiredStock || [], 'Month Name');
+    exData.slice(0,30).forEach(r => {
+        exTb.innerHTML += `<tr><td>${r.No||''}</td><td>${(r.Description||'').substring(0,45)}</td><td>${r['MFD Date']||''}</td><td>${r['Expiry Date']||''}</td><td>${r['Pack Size']||''}</td><td>${r['Sum of Total Quantity']||''}</td><td>${r['Month Name']||''}</td></tr>`;
+    });
+}
+
+// ==================== QUALITY & COMPLIANCE ====================
+function populateQualFilters() {
+    const selS = document.getElementById('qualSite');
+    const selV = document.getElementById('qualVendor');
+    const savedS = selS.value, savedV = selV.value;
+    const sites = new Set();
+    (DATA.damages||[]).forEach(r => { if (r['Site Name']) sites.add(r['Site Name']); });
+    const vendors = new Set();
+    (DATA.qualityIssues||[]).forEach(r => { if (r['Vendor Name']) vendors.add(r['Vendor Name']); });
+    selS.innerHTML = '<option value="all">All Sites</option>';
+    [...sites].sort().forEach(s => { const o = document.createElement('option'); o.value = s; o.text = s.length > 35 ? s.substring(0,35)+'...' : s; selS.appendChild(o); });
+    selV.innerHTML = '<option value="all">All Vendors</option>';
+    [...vendors].sort().forEach(v => { const o = document.createElement('option'); o.value = v; o.text = v.length > 35 ? v.substring(0,35)+'...' : v; selV.appendChild(o); });
+    if ([...selS.options].some(o => o.value === savedS)) selS.value = savedS;
+    if ([...selV.options].some(o => o.value === savedV)) selV.value = savedV;
+}
+function getQualFilter() {
+    return { site: document.getElementById('qualSite').value, vendor: document.getElementById('qualVendor').value };
+}
+function qualFilterArr(arr, siteKey, vendorKey) {
+    const {site, vendor} = getQualFilter();
+    let result = arr || [];
+    if (site !== 'all' && siteKey) result = result.filter(r => (r[siteKey]||'') === site);
+    if (vendor !== 'all' && vendorKey) result = result.filter(r => (r[vendorKey]||'') === vendor);
+    return result;
+}
+function reRenderQuality() {
+    renderedTabs.delete('quality');
+    ['chartDamageVendor','chartQualType','chartComplaintTrend','chartComplaintType'].forEach(id => {
+        if (allCharts[id]) { allCharts[id].destroy(); delete allCharts[id]; }
+    });
+    ['#tblWhDamages tbody','#tblComplaints tbody','#tblFzeGw tbody'].forEach(sel => {
+        const tb = document.querySelector(sel); if (tb) tb.innerHTML = '';
+    });
+    renderQuality();
+    renderedTabs.add('quality');
+}
+function resetQualFilter() {
+    document.getElementById('qualSite').value = 'all';
+    document.getElementById('qualVendor').value = 'all';
+    reRenderQuality();
+}
+
+function renderQuality() {
+    populateQualFilters();
+    const qi = gf(DATA.qualityIssues, 'Month');
+    const dm = gf(DATA.damages, 'Month');
+    const wd = gf(DATA.whDamages, 'Month');
+    const cc = gf(DATA.customerComplaints, 'Date');
+    const {site, vendor} = getQualFilter();
+    const qiF = vendor !== 'all' ? qi.filter(r => (r['Vendor Name']||'') === vendor) : qi;
+    const dmF = site !== 'all' ? dm.filter(r => (r['Site Name']||'') === site) : dm;
+
+    const totalDmgCases = sumArr(dmF, 'Damaged / Short Units Qty in cases');
+    const totalGrn = sumArr(dmF, 'GRN Qty in Cases');
+    const dmgPct = totalGrn ? ((totalDmgCases/totalGrn)*100).toFixed(2) : '0';
+
+    document.getElementById('qualCards').innerHTML =
+        makeCard('Quality Issues', String(qiF.length), 'Total logged') +
+        makeCard('Damage Rate', dmgPct + '%', `${fmt(totalDmgCases)} of ${fmt(totalGrn)}`) +
+        makeCard('WH Damages', String(wd.length), 'Handling damage incidents') +
+        makeCard('Complaints', String(cc.length), 'Customer complaints logged');
+
+    // Damage by Vendor
+    const vendorDmg = {};
+    dmF.forEach(r => { const v = (r['Site Name']||'').substring(0,25); vendorDmg[v] = (vendorDmg[v]||0) + num(r['Damaged / Short Units Qty in cases']); });
+    const vdSorted = Object.entries(vendorDmg).filter(e=>e[1]>0).sort((a,b)=>b[1]-a[1]);
+    makeChart('chartDamageVendor', {
+        type: 'bar',
+        data: { labels: vdSorted.map(v=>v[0]), datasets: [{label:'Damaged Cases',data:vdSorted.map(v=>v[1]),backgroundColor:COLORS.orange}] },
+        options:{indexAxis:'y',plugins:{legend:{display:false}}}
+    });
+
+    // Quality Issues by Type
+    const issueTypes = {};
+    qiF.forEach(r => { const t = r.Issues || 'Other'; issueTypes[t] = (issueTypes[t]||0) + 1; });
+    makeChart('chartQualType', {
+        type: 'doughnut',
+        data: { labels: Object.keys(issueTypes), datasets: [{data:Object.values(issueTypes),backgroundColor:COLORS.set}] }
+    });
+
+    // Complaint Trend
+    const compByMonth = {};
+    cc.forEach(r => {
+        const d = r.Date || '';
+        const parts = d.split('-');
+        const key = parts.length >= 3 ? `${parts[1]}-${parts[2]}` : d;
+        compByMonth[key] = (compByMonth[key]||0) + 1;
+    });
+    const compMonths = Object.keys(compByMonth).slice(-18);
+    makeChart('chartComplaintTrend', {
+        type: 'bar',
+        data: { labels: compMonths, datasets: [{label:'Complaints',data:compMonths.map(m=>compByMonth[m]),backgroundColor:COLORS.rust}] },
+        options:{plugins:{legend:{display:false}}}
+    });
+
+    // Complaint Types
+    const compTypes = {};
+    cc.forEach(r => { const t = r['Complaint Type'] || 'Other'; compTypes[t] = (compTypes[t]||0) + 1; });
+    makeChart('chartComplaintType', {
+        type: 'pie',
+        data: { labels: Object.keys(compTypes), datasets: [{data:Object.values(compTypes),backgroundColor:COLORS.set}] }
+    });
+
+    // WH Damages Table
+    const wdTb = document.querySelector('#tblWhDamages tbody');
+    wd.slice(0,30).forEach(r => {
+        wdTb.innerHTML += `<tr><td>${r.Month||''}</td><td>${r['SKU No']||r.No||''}</td><td>${(r.Description||'').substring(0,40)}</td><td>${r['Total Quantity']||''}</td><td>${r['Expiry Date']||''}</td><td>${r.Remarks||r['Hold Remarks']||''}</td><td>${r.Vendor||''}</td></tr>`;
+    });
+
+    // Complaints Table
+    const ccTb = document.querySelector('#tblComplaints tbody');
+    cc.slice(0,30).forEach(r => {
+        const st = (r.Staus||r.Status||'');
+        ccTb.innerHTML += `<tr><td>${r.Date||''}</td><td>${r['Customer Name']||''}</td><td>${(r.Description||'').substring(0,35)}</td><td>${r['DO Qty']||''}</td><td>${r['Physical Rec Qty']||''}</td><td>${r.Differents||''}</td><td>${r['Complaint Type']||''}</td><td><span class="pill ${st.includes('Close')?'green':'orange'}">${st}</span></td></tr>`;
+    });
+
+    // FZE SKU Gross Weight Table
+    const fzeTb = document.querySelector('#tblFzeGw tbody');
+    gf(DATA.fzeSkuGw || [], 'Year - Month').forEach(r => {
+        fzeTb.innerHTML += `<tr><td>${r['Year - Month']||''}</td><td>${r['SR. No']||''}</td><td>${r['Item Code']||''}</td><td>${(r.Description||'').substring(0,45)}</td><td>${r['GW - Box-1']||''}</td><td>${r['GW - Box-2']||''}</td><td>${r['GW - Box-3']||''}</td><td>${r['GW - Box-4']||''}</td><td>${r['GW - Box-5']||''}</td></tr>`;
+    });
+}
+
+// ==================== COST & EFFICIENCY ====================
+function populateCostFilter() {
+    const sel = document.getElementById('costHub');
+    const saved = sel.value;
+    const hubs = new Set();
+    (DATA.costingDet||[]).forEach(r => { if (r.Hub) hubs.add(r.Hub); });
+    sel.innerHTML = '<option value="all">All Hubs</option>';
+    [...hubs].sort().forEach(h => { const o = document.createElement('option'); o.value = h; o.text = h; sel.appendChild(o); });
+    if ([...sel.options].some(o => o.value === saved)) sel.value = saved;
+}
+function getCostHub() { return document.getElementById('costHub').value; }
+function costFilterArr(arr) {
+    const h = getCostHub();
+    if (h === 'all') return arr || [];
+    return (arr||[]).filter(r => (r.Hub||'') === h);
+}
+function reRenderCost() {
+    renderedTabs.delete('cost');
+    ['chartCostBreak','chartCostUnit','chartInvoiceHub','chartOvertime'].forEach(id => {
+        if (allCharts[id]) { allCharts[id].destroy(); delete allCharts[id]; }
+    });
+    const tb = document.querySelector('#tblCosting tbody');
+    if (tb) tb.innerHTML = '';
+    renderCost();
+    renderedTabs.add('cost');
+}
+function resetCostFilter() {
+    document.getElementById('costHub').value = 'all';
+    reRenderCost();
+}
+
+function renderCost() {
+    populateCostFilter();
+    const cd = costFilterArr(gf(DATA.costingDet, 'Month-Year'));
+    const ot = gf(DATA.overtime, 'Date');
+    const inv = gf(DATA.invoiceSummary, 'Month');
+
+    const latest = cd[cd.length-1] || {};
+    const totalCases = num(latest['Total Cases']);
+    const totalPallets = num(latest.Pallets||latest['Total Pallets']||0) || (num(latest['Pallets In'])+num(latest['Pallets Out']));
+    const totalAED = num(latest['Total price (AED)']);
+    const costPerCase = totalCases ? (totalAED/totalCases).toFixed(2) : '0';
+    const costPerPallet = totalPallets ? (totalAED/totalPallets).toFixed(0) : '0';
+    const totalOT = ot.reduce((s,r)=>s+num(r[' Amount ']||r.Amount||0),0);
+
+    document.getElementById('costCards').innerHTML =
+        makeCard('Total Cost', fmt(totalAED) + ' AED', latest['Month-Year']||'Latest') +
+        makeCard('Cost/Case', costPerCase + ' AED', 'Latest month') +
+        makeCard('Cost/Pallet', costPerPallet + ' AED', 'Latest month') +
+        makeCard('Overtime', fmt(totalOT) + ' AED', `${ot.length} events logged`, null, 'orange');
+
+    // Cost Breakdown
+    const cdSlice = lastN(cd, 15, 'Total price (AED)');
+    const costComponents = ['Handling IN','Handling Out','Pick & Pack','Over Time','Manag. Fees'];
+    makeChart('chartCostBreak', {
+        type: 'bar',
+        data: {
+            labels: cdSlice.map(r=>r['Month-Year']),
+            datasets: costComponents.map((c,i) => ({
+                label: c, data: cdSlice.map(r=>num(r[c])), backgroundColor: COLORS.set[i]
+            }))
+        },
+        options:{scales:{x:{stacked:true,ticks:{maxRotation:45}},y:{stacked:true,ticks:{callback:v=>fmt(v)}}}}
+    });
+
+    // Cost per unit trends
+    makeChart('chartCostUnit', {
+        type: 'line',
+        data: {
+            labels: lastN(cd,24,'Total price (AED)').map(r=>r['Month-Year']),
+            datasets: [
+                {label:'Cost/Case (AED)',data:lastN(cd,24,'Total price (AED)').map(r=>{const t=num(r['Total Cases']);return t?num(r['Total price (AED)'])/t:0}),borderColor:COLORS.teal,tension:.3,yAxisID:'y'},
+                {label:'Total Cost (AED)',data:lastN(cd,24,'Total price (AED)').map(r=>num(r['Total price (AED)'])),borderColor:COLORS.orange,tension:.3,yAxisID:'y1',borderDash:[5,5]}
+            ]
+        },
+        options:{scales:{y:{position:'left',title:{display:true,text:'Cost/Case'}},y1:{position:'right',grid:{drawOnChartArea:false},title:{display:true,text:'Total Cost'},ticks:{callback:v=>fmt(v)}},x:{ticks:{maxRotation:45,font:{size:10}}}}}
+    });
+
+    // Invoice Hub
+    const hubTotals = {};
+    inv.forEach(r => {
+        ['GCC & NA','Turkey','South Africa','Russia FZCO'].forEach(h => {
+            hubTotals[h] = (hubTotals[h]||0) + num(r[h]);
+        });
+    });
+    makeChart('chartInvoiceHub', {
+        type: 'doughnut',
+        data: { labels: Object.keys(hubTotals), datasets: [{data:Object.values(hubTotals),backgroundColor:[COLORS.teal,COLORS.orange,COLORS.green,COLORS.amber]}] }
+    });
+
+    // Overtime
+    if (ot.length > 0) {
+        makeChart('chartOvertime', {
+            type: 'bar',
+            data: {
+                labels: ot.map(r=>(r[' Date ']||r.Date||'').trim()),
+                datasets: [
+                    {label:'Hours',data:ot.map(r=>num(r[' Hrs ']||r.Hrs)),backgroundColor:COLORS.teal,yAxisID:'y'},
+                    {label:'Amount (AED)',data:ot.map(r=>num(r[' Amount ']||r.Amount)),type:'line',borderColor:COLORS.orange,yAxisID:'y1'}
+                ]
+            },
+            options:{scales:{y:{position:'left',title:{display:true,text:'Hours'}},y1:{position:'right',grid:{drawOnChartArea:false},title:{display:true,text:'AED'}}}}
+        });
+    }
+
+    // Costing Table
+    const ctTb = document.querySelector('#tblCosting tbody');
+    lastN(cd, 18, 'Total price (AED)').forEach(r => {
+        ctTb.innerHTML += `<tr><td>${r['Month-Year']||''}</td><td>${fmtN(num(r['Inbound Cases']))}</td><td>${fmtN(num(r['Outbound Cases']))}</td><td>${fmtN(num(r['Storage Cases']))}</td><td>${fmtN(num(r['Total Cases']))}</td><td>${fmtN(num(r['Pallets In']))}</td><td>${fmtN(num(r['Pallets Out']))}</td><td>${fmtN(num(r['Handling IN']))}</td><td>${fmtN(num(r['Handling Out']))}</td><td>${fmtN(num(r['Pick & Pack']))}</td><td>${fmtN(num(r['Over Time']))}</td><td>${fmtN(num(r['Manag. Fees']))}</td><td style="font-weight:700;color:var(--orange)">${fmtN(num(r['Total price (AED)']))}</td></tr>`;
+    });
+}
+
+// ==================== FREIGHT & TRANSPORTATION ====================
+function populateFrFilter() {
+    const sel = document.getElementById('frCountry');
+    const saved = sel.value;
+    const countries = new Set();
+    (DATA.freights||[]).forEach(r => { if (r.Country) countries.add(r.Country); });
+    sel.innerHTML = '<option value="all">All Countries</option>';
+    [...countries].sort().forEach(c => { const o = document.createElement('option'); o.value = c; o.text = c; sel.appendChild(o); });
+    if ([...sel.options].some(o => o.value === saved)) sel.value = saved;
+}
+function getFrCountry() { return document.getElementById('frCountry').value; }
+function frFilterArr(arr) {
+    const c = getFrCountry();
+    if (c === 'all') return arr || [];
+    return (arr||[]).filter(r => (r.Country||'') === c);
+}
+function reRenderFreight() {
+    renderedTabs.delete('freight');
+    ['chartFreightCountry','chartLoadability','chartEquipment','chartFreightCost','chartTurnoverMonth','chartTurnoverSite'].forEach(id => {
+        if (allCharts[id]) { allCharts[id].destroy(); delete allCharts[id]; }
+    });
+    const wcTb = document.querySelector('#tblWaiting tbody');
+    if (wcTb) wcTb.innerHTML = '';
+    renderFreight();
+    renderedTabs.add('freight');
+}
+function resetFrFilter() {
+    document.getElementById('frCountry').value = 'all';
+    reRenderFreight();
+}
+function renderFreight() {
+    populateFrFilter();
+    const fr = frFilterArr(gf((DATA2?.freights || DATA.freights), 'Month'));
+    const wc = gf(DATA.waitingCharges, 'Month&Year');
+
+    const totalCases = sumArr(fr, 'Total Cases');
+    const totalTrucks = sumArr(fr, 'Total Trucks');
+    const totalFreight = sumArr(fr, 'Total Freight');
+    const avgLoadPct = fr.length ? (fr.reduce((s,r)=>s+num(r['Pallet Load Ability %']),0)/fr.filter(r=>num(r['Pallet Load Ability %'])>0).length).toFixed(0) : 0;
+
+    document.getElementById('freightCards').innerHTML =
+        makeCard('Total Cases Shipped', fmt(totalCases), 'All time') +
+        makeCard('Trucks', fmt(totalTrucks), 'Total dispatched') +
+        makeCard('Total Freight', fmt(totalFreight) + ' AED', 'All time cost') +
+        makeCard('Avg Load Ability', avgLoadPct + '%', 'Pallet loadability');
+
+    // Freight by Country
+    const countryAgg = {};
+    fr.forEach(r => { const c = r.Country||''; countryAgg[c] = (countryAgg[c]||0) + num(r['Total Cases']); });
+    const cSorted = Object.entries(countryAgg).filter(e=>e[1]>0).sort((a,b)=>b[1]-a[1]);
+    makeChart('chartFreightCountry', {
+        type: 'bar',
+        data: { labels: cSorted.map(c=>c[0]), datasets: [{label:'Cases',data:cSorted.map(c=>c[1]),backgroundColor:COLORS.set}] },
+        options:{plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>fmt(v)}}}}
+    });
+
+    // Loadability
+    const countryLoad = {};
+    fr.forEach(r => {
+        const c = r.Country||'';
+        if (!countryLoad[c]) countryLoad[c] = {pallet:[],cases:[]};
+        const pv = num(r['Pallet Load Ability %']);
+        const cv = num(r['Cases Load Ability %']);
+        if(pv) countryLoad[c].pallet.push(pv);
+        if(cv) countryLoad[c].cases.push(cv);
+    });
+    const loadCountries = Object.keys(countryLoad).filter(c=>countryLoad[c].pallet.length>0);
+    makeChart('chartLoadability', {
+        type: 'bar',
+        data: {
+            labels: loadCountries,
+            datasets: [
+                {label:'Pallet Load %',data:loadCountries.map(c=>{const a=countryLoad[c].pallet;return a.length?(a.reduce((s,v)=>s+v,0)/a.length).toFixed(0):0}),backgroundColor:COLORS.teal},
+                {label:'Cases Load %',data:loadCountries.map(c=>{const a=countryLoad[c].cases;return a.length?(a.reduce((s,v)=>s+v,0)/a.length).toFixed(0):0}),backgroundColor:COLORS.orange}
+            ]
+        },
+        options:{scales:{y:{title:{display:true,text:'%'}}}}
+    });
+
+    // Equipment Profile
+    const equipAgg = {};
+    fr.forEach(r => { const e = r.Equipment||''; equipAgg[e] = (equipAgg[e]||0) + num(r['Total Trucks']); });
+    const eSorted = Object.entries(equipAgg).filter(e=>e[1]>0);
+    makeChart('chartEquipment', {
+        type: 'doughnut',
+        data: { labels: eSorted.map(e=>e[0]), datasets: [{data:eSorted.map(e=>e[1]),backgroundColor:COLORS.set}] },
+        options:{plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:10,padding:5}}}},
+        _h:'420px'
+    });
+
+    // Freight Cost per Case
+    const countryFpc = {};
+    fr.forEach(r => {
+        const c = r.Country||'';
+        const fpc = num(r['Freight Per Case']);
+        if (fpc > 0) {
+            if (!countryFpc[c]) countryFpc[c] = [];
+            countryFpc[c].push(fpc);
+        }
+    });
+    const fpcCountries = Object.keys(countryFpc);
+    makeChart('chartFreightCost', {
+        type: 'bar',
+        data: {
+            labels: fpcCountries,
+            datasets: [{label:'Avg Freight/Case (AED)',data:fpcCountries.map(c=>(countryFpc[c].reduce((s,v)=>s+v,0)/countryFpc[c].length).toFixed(2)),backgroundColor:COLORS.set}]
+        },
+        options:{plugins:{legend:{display:false}},scales:{y:{title:{display:true,text:'AED'}}}}
+    });
+
+    // Truck Turnover Analysis
+    const ttAll = gf(DATA.truckTurnover || [], 'Month');
+    const monthTO = {};
+    ttAll.forEach(r => {
+        const m = r.Month || '';
+        const t = r['Turnover Time']||'';
+        const parts = t.split(':');
+        if (parts.length >= 2 && m) {
+            const mins = parseInt(parts[0])*60 + parseInt(parts[1]);
+            if (!monthTO[m]) monthTO[m] = [];
+            monthTO[m].push(mins);
+        }
+    });
+    const toMonths = Object.keys(monthTO).slice(-18);
+    makeChart('chartTurnoverMonth', {
+        type: 'line',
+        data: {
+            labels: toMonths,
+            datasets: [{label:'Avg Turnover (min)',data:toMonths.map(m=>(monthTO[m].reduce((a,b)=>a+b,0)/monthTO[m].length).toFixed(0)),borderColor:COLORS.teal,backgroundColor:COLORS.teal+'20',fill:true,tension:.3}]
+        },
+        options:{scales:{y:{title:{display:true,text:'Minutes'}},x:{ticks:{maxRotation:45}}}}
+    });
+    const siteTO2 = {};
+    ttAll.forEach(r => {
+        const site = (r.Site||'').substring(0,25);
+        const t = r['Turnover Time']||'';
+        const parts = t.split(':');
+        if (parts.length >= 2 && site) {
+            const mins = parseInt(parts[0])*60 + parseInt(parts[1]);
+            if (!siteTO2[site]) siteTO2[site] = [];
+            siteTO2[site].push(mins);
+        }
+    });
+    const toSites2 = Object.entries(siteTO2).map(([s,arr])=>([s,(arr.reduce((a,b)=>a+b,0)/arr.length).toFixed(0)])).sort((a,b)=>b[1]-a[1]);
+    makeChart('chartTurnoverSite', {
+        type: 'bar',
+        data: { labels: toSites2.map(s=>s[0]), datasets: [{label:'Avg Minutes',data:toSites2.map(s=>Number(s[1])),backgroundColor:COLORS.set}] },
+        options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{title:{display:true,text:'Minutes'}}}}
+    });
+
+    // Waiting Charges Table
+    const wcTb = document.querySelector('#tblWaiting tbody');
+    lastN(wc, 24, 'Total').forEach(r => {
+        wcTb.innerHTML += `<tr><td>${r['Month&Year']||''}</td><td>${fmtN(num(r.KSA))}</td><td>${fmtN(num(r.OMAN))}</td><td>${fmtN(num(r.UAE))}</td><td>${fmtN(num(r.Bahrain))}</td><td>${fmtN(num(r.Kuwait))}</td><td>${fmtN(num(r.Qatar))}</td><td>${fmtN(num(r.Jordan))}</td><td style="font-weight:700;color:var(--orange)">${fmtN(num(r.Total))}</td></tr>`;
+    });
+}
+
+// ==================== ORDERS & SERVICE LEVELS ====================
+function populateOrdFilter() {
+    const sel = document.getElementById('ordWeek');
+    const saved = sel.value;
+    const weeks = new Set();
+    (DATA.weeklyOrders||[]).forEach(r => { if (r.Week) weeks.add(r.Week); });
+    sel.innerHTML = '<option value="all">All Weeks</option>';
+    [...weeks].sort((a,b) => String(a).localeCompare(String(b), undefined, {numeric:true})).forEach(w => { const o = document.createElement('option'); o.value = w; o.text = w; sel.appendChild(o); });
+    if ([...sel.options].some(o => o.value === saved)) sel.value = saved;
+}
+function getOrdWeek() { return document.getElementById('ordWeek').value; }
+function ordFilterArr(arr) {
+    const w = getOrdWeek();
+    if (w === 'all') return arr || [];
+    return (arr||[]).filter(r => String(r.Week||'') === w);
+}
+function reRenderOrders() {
+    renderedTabs.delete('orders');
+    ['chartWeekOrders','chartManualOrders','chartOutbCust','chartTrucksCust'].forEach(id => {
+        if (allCharts[id]) { allCharts[id].destroy(); delete allCharts[id]; }
+    });
+    const tb = document.querySelector('#tblHubOutbound tbody');
+    if (tb) tb.innerHTML = '';
+    renderOrders();
+    renderedTabs.add('orders');
+}
+function resetOrdFilter() {
+    document.getElementById('ordWeek').value = 'all';
+    reRenderOrders();
+}
+
+function renderOrders() {
+    populateOrdFilter();
+    const wo = ordFilterArr(gf(DATA.weeklyOrders, 'Month')).filter(r => num(r['No of Orders']) > 0 || num(r['Order in Cases']) > 0);
+    const mo = gf(DATA.manualOrders, 'Month&Year').filter(r => num(r['Total # Orders']) > 0);
+    const ho = gf(DATA.hubOutbound, 'Month Name');
+    const oc = gf((DATA2?.outboundCases || DATA.outboundCases), 'Year');
+    const tc = gf((DATA2?.trucksContainers || DATA.trucksContainers), 'Year');
+
+    const latestWoMonth = wo.length > 0 ? wo[wo.length-1].Month : '';
+    const latestWo = wo.filter(r => r.Month === latestWoMonth);
+    const totalOrders = sumArr(latestWo, 'No of Orders');
+    const totalShipped = sumArr(latestWo, 'Shipped Cases');
+    const latestManual = mo[mo.length-1] || {};
+
+    document.getElementById('orderCards').innerHTML =
+        makeCard('Total Orders', fmt(totalOrders), 'Current period') +
+        makeCard('Shipped Cases', fmt(totalShipped), 'Current period') +
+        makeCard('Manual Orders', latestManual['Manual Orders']||'0', `${latestManual['%']||''} of total`) +
+        makeCard('API Orders', latestManual["API's Order"]||'0', latestManual['Month&Year']||'');
+
+    // Weekly Orders
+    makeChart('chartWeekOrders', {
+        type: 'bar',
+        data: {
+            labels: wo.map(r=>`${r.Month} ${r.Week}`),
+            datasets: [
+                {label:'Order Cases',data:wo.map(r=>num(r['Order in Cases'])),backgroundColor:COLORS.teal},
+                {label:'Shipped Cases',data:wo.map(r=>num(r['Shipped Cases'])),backgroundColor:COLORS.orange}
+            ]
+        },
+        options:{scales:{y:{ticks:{callback:v=>fmt(v)}},x:{ticks:{maxRotation:45}}}}
+    });
+
+    // Manual vs API
+    const moSlice = lastN(mo, 18, 'Total # Orders');
+    makeChart('chartManualOrders', {
+        type: 'line',
+        data: {
+            labels: moSlice.map(r=>r['Month&Year']),
+            datasets: [
+                {label:'API Orders',data:moSlice.map(r=>num(r["API's Order"])),borderColor:COLORS.teal,tension:.3,fill:false},
+                {label:'Manual Orders',data:moSlice.map(r=>num(r['Manual Orders'])),borderColor:COLORS.orange,tension:.3,fill:false},
+                {label:'Manual %',data:moSlice.map(r=>num(r['%'])),borderColor:COLORS.rust,tension:.3,borderDash:[5,5],yAxisID:'y1'}
+            ]
+        },
+        options:{scales:{y:{position:'left'},y1:{position:'right',grid:{drawOnChartArea:false},title:{display:true,text:'%'},ticks:{callback:v=>v+'%'}},x:{ticks:{maxRotation:45,font:{size:10}}}}}
+    });
+
+    // Outbound by Customer
+    const custCases = {};
+    oc.forEach(r => { const s = (r['Site ']||r.Site||'').substring(0,25); custCases[s] = (custCases[s]||0) + num(r.Total); });
+    const ccSorted = Object.entries(custCases).filter(e=>e[1]>0).sort((a,b)=>b[1]-a[1]).slice(0,10);
+    makeChart('chartOutbCust', {
+        type: 'bar',
+        data: { labels: ccSorted.map(c=>c[0]), datasets: [{label:'Cases',data:ccSorted.map(c=>c[1]),backgroundColor:COLORS.set}] },
+        options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{ticks:{callback:v=>fmt(v)}}}}
+    });
+
+    // Trucks by Customer
+    const custTrucks = {};
+    tc.forEach(r => { const s = (r['Site ']||r.Site||'').substring(0,25); custTrucks[s] = (custTrucks[s]||0) + num(r.Total); });
+    const ctSorted = Object.entries(custTrucks).filter(e=>e[1]>0).sort((a,b)=>b[1]-a[1]).slice(0,10);
+    makeChart('chartTrucksCust', {
+        type: 'bar',
+        data: { labels: ctSorted.map(c=>c[0]), datasets: [{label:'Trucks',data:ctSorted.map(c=>c[1]),backgroundColor:COLORS.set}] },
+        options:{indexAxis:'y',plugins:{legend:{display:false}}}
+    });
+
+    // Hub Outbound Table
+    const hoTb = document.querySelector('#tblHubOutbound tbody');
+    ho.slice(0,30).forEach(r => {
+        hoTb.innerHTML += `<tr><td>${r.Customer||r['Row Labels']||''}</td><td>${r['Month Name']||''}</td><td>${fmtN(num(r['GCC & NA']))}</td><td>${fmtN(num(r.LATVIA))}</td><td>${fmtN(num(r['SA & E AFRICA']))}</td><td>${fmtN(num(r.HUSA))}</td><td>${fmtN(num(r.EUROPE))}</td><td>${fmtN(num(r.RUSSIA))}</td></tr>`;
+    });
+}
+
+// ==================== CO-PACKING ====================
+function populateCpFilter() {
+    const sel = document.getElementById('cpCust');
+    const saved = sel.value;
+    const custs = new Set();
+    (DATA.copackingWeekly||[]).forEach(r => { if (r['Customer Name']) custs.add(r['Customer Name']); });
+    (DATA.copackingOrders||[]).forEach(r => { if (r['Customer Name']) custs.add(r['Customer Name']); });
+    sel.innerHTML = '<option value="all">All Customers</option>';
+    [...custs].sort().forEach(c => { const o = document.createElement('option'); o.value = c; o.text = c.length > 35 ? c.substring(0,35)+'...' : c; sel.appendChild(o); });
+    if ([...sel.options].some(o => o.value === saved)) sel.value = saved;
+}
+function getCpCust() { return document.getElementById('cpCust').value; }
+function cpFilterArr(arr) {
+    const c = getCpCust();
+    if (c === 'all') return arr || [];
+    return (arr||[]).filter(r => (r['Customer Name']||'') === c);
+}
+function reRenderCoPacking() {
+    renderedTabs.delete('copacking');
+    ['chartCopackWeek','chartCopackType'].forEach(id => {
+        if (allCharts[id]) { allCharts[id].destroy(); delete allCharts[id]; }
+    });
+    const tb = document.querySelector('#tblCoPacking tbody');
+    if (tb) tb.innerHTML = '';
+    renderCoPacking();
+    renderedTabs.add('copacking');
+}
+function resetCpFilter() {
+    document.getElementById('cpCust').value = 'all';
+    reRenderCoPacking();
+}
+
+function renderCoPacking() {
+    populateCpFilter();
+    const cw = cpFilterArr(gf(DATA.copackingWeekly, 'Month')).filter(r => num(r['No.of Cases']) > 0 || num(r['No.of Orders']) > 0);
+    const cp = gf(DATA.coPacking, 'Month Name');
+    const co = cpFilterArr(gf(DATA.copackingOrders, 'Month'));
+
+    const latestCwMonth = cw.length > 0 ? cw[cw.length-1].Month : '';
+    const latestCw = cw.filter(r => r.Month === latestCwMonth);
+    const totalCopackCases = sumArr(latestCw, 'No.of Cases');
+    const totalCopackOrders = sumArr(latestCw, 'No.of Orders');
+    const totalCopackAmt = sumArr(cp, 'Total Amount');
+
+    document.getElementById('copackCards').innerHTML =
+        makeCard('Co-Pack Orders', fmt(totalCopackOrders), 'Current period') +
+        makeCard('Co-Pack Cases', fmt(totalCopackCases), 'Current period') +
+        makeCard('Co-Pack Value', fmt(totalCopackAmt) + ' AED', 'Production value') +
+        makeCard('Pending Orders', String(co.filter(r=>(r.Remarks||'').includes('Below')).length), 'Below threshold');
+
+    // Weekly
+    makeChart('chartCopackWeek', {
+        type: 'bar',
+        data: {
+            labels: cw.map(r=>`${r.Month} ${r.Week}`),
+            datasets: [
+                {label:'Cases',data:cw.map(r=>num(r['No.of Cases'])),backgroundColor:COLORS.teal,yAxisID:'y'},
+                {label:'Orders',data:cw.map(r=>num(r['No.of Orders'])),type:'line',borderColor:COLORS.orange,yAxisID:'y1'}
+            ]
+        },
+        options:{scales:{y:{position:'left',title:{display:true,text:'Cases'}},y1:{position:'right',grid:{drawOnChartArea:false},title:{display:true,text:'Orders'}}}}
+    });
+
+    // By Type
+    const typeAgg = {};
+    cp.forEach(r => { const t = r.Remarks || 'Other'; typeAgg[t] = (typeAgg[t]||0) + num(r['Production Qty (Cases)']); });
+    makeChart('chartCopackType', {
+        type: 'doughnut',
+        data: { labels: Object.keys(typeAgg), datasets: [{data:Object.values(typeAgg),backgroundColor:COLORS.set}] }
+    });
+
+    // Orders Table
+    const cpTb = document.querySelector('#tblCoPacking tbody');
+    co.slice(0,30).forEach(r => {
+        cpTb.innerHTML += `<tr><td>${r.Month||''}</td><td>${r['Client Order No']||''}</td><td>${r['Customer Name']||''}</td><td>${r['SKU No']||''}</td><td>${(r.Description||'').substring(0,40)}</td><td>${r.Cases||''}</td><td><span class="pill ${(r.Remarks||'').includes('Below')?'orange':'green'}">${r.Remarks||''}</span></td></tr>`;
+    });
+}
+
+// ==================== ENVIRONMENTAL ====================
+function renderEnvironment() {
+    const tmp = gf(DATA.tempReport || [], 'Date');
+
+    if (tmp.length === 0) {
+        document.getElementById('envCards').innerHTML = makeCard('No Data', '-', 'Upload temperature data');
+        return;
+    }
+
+    const maxT = Math.max(...tmp.map(r=>num(r['Max. temperature'])));
+    const minT = Math.min(...tmp.filter(r=>num(r['Min. temperature'])>0).map(r=>num(r['Min. temperature'])));
+    const avgT = (tmp.reduce((s,r)=>s+num(r.Average),0)/tmp.length).toFixed(1);
+
+    document.getElementById('envCards').innerHTML =
+        makeCard('Max Temperature', maxT.toFixed(1) + '°C', 'Peak recorded') +
+        makeCard('Min Temperature', minT.toFixed(1) + '°C', 'Lowest recorded') +
+        makeCard('Avg Temperature', avgT + '°C', `${tmp.length} readings`) +
+        makeCard('Compliance', maxT <= 30 && minT >= 15 ? 'PASS' : 'ALERT', '15-30°C range', null, maxT > 30 || minT < 15 ? 'orange' : '');
+
+    const tmpSlice = lastN(tmp, 60, 'Max. temperature');
+    makeChart('chartTemp', {
+        type: 'line',
+        _h: '400px',
+        data: {
+            labels: tmpSlice.map(r=>r.Date),
+            datasets: [
+                {label:'Max Temp',data:tmpSlice.map(r=>num(r['Max. temperature'])),borderColor:COLORS.rust,backgroundColor:COLORS.rust+'15',fill:'+1',tension:.3,pointRadius:1},
+                {label:'Min Temp',data:tmpSlice.map(r=>num(r['Min. temperature'])),borderColor:COLORS.teal,backgroundColor:COLORS.teal+'15',fill:false,tension:.3,pointRadius:1},
+                {label:'Average',data:tmpSlice.map(r=>num(r.Average)),borderColor:COLORS.orange,borderDash:[5,5],tension:.3,pointRadius:0}
+            ]
+        },
+        options:{scales:{y:{title:{display:true,text:'°C'},suggestedMin:15,suggestedMax:35},x:{ticks:{maxRotation:45,font:{size:9},maxTicksLimit:30}}}}
+    });
+}
+
+// ==================== EXCEL INTEGRATION ====================
+let _lastDataMtime = 0;
+let _autoSyncTimer = null;
+
+function showToast(msg, bg, duration) {
+    let toast = document.getElementById('refreshToast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'refreshToast';
+        toast.style.cssText = 'position:fixed;top:20px;right:20px;z-index:10000;padding:14px 24px;border-radius:8px;font:600 14px Calibri,sans-serif;color:#fff;box-shadow:0 4px 20px rgba(0,0,0,.2);transition:opacity .4s';
+        document.body.appendChild(toast);
+    }
+    toast.style.background = bg;
+    toast.style.opacity = '1';
+    toast.textContent = msg;
+    if (duration) setTimeout(() => { toast.style.opacity = '0'; }, duration);
+}
+
+async function openExcel() {
+    const btn = document.getElementById('editExcelBtn');
+    btn.disabled = true;
+    btn.textContent = 'Opening...';
+    try {
+        const res = await fetch('/api/open-excel');
+        const data = await res.json();
+        if (data.ok) {
+            showToast('Opened ' + data.file + ' in Excel', 'var(--green)', 3000);
+            document.getElementById('fileStatus').textContent = data.file;
+        } else {
+            showToast('Error: ' + data.error, 'var(--rust)', 5000);
+        }
+    } catch(e) {
+        showToast('Server not reachable', 'var(--rust)', 4000);
+    }
+    btn.disabled = false;
+    btn.innerHTML = '&#x270E; Edit in Excel';
+}
+
+async function syncData() {
+    const btn = document.getElementById('syncBtn');
+    btn.disabled = true;
+    btn.textContent = 'Extracting...';
+    showToast('Extracting data from Excel... this takes ~2 min', 'var(--orange)');
+    try {
+        const res = await fetch('/api/extract');
+        const data = await res.json();
+        if (data.ok) {
+            pollExtraction();
+        } else {
+            showToast('Error: ' + (data.message||'').substring(0,100), 'var(--rust)', 5000);
+            btn.disabled = false;
+            btn.innerHTML = '&#x21BB; Sync';
+        }
+    } catch(e) {
+        showToast('Server not reachable — open dashboard via http://localhost:8765', 'var(--rust)', 6000);
+        btn.disabled = false;
+        btn.innerHTML = '&#x21BB; Sync';
+    }
+}
+
+function pollExtraction() {
+    const poll = setInterval(async () => {
+        try {
+            const res = await fetch('/api/data-mtime');
+            const d = await res.json();
+            if (!d.extracting) {
+                clearInterval(poll);
+                if (d.mtime > _lastDataMtime) {
+                    showToast('Extraction complete — reloading...', 'var(--green)', 2000);
+                    setTimeout(() => window.location.reload(), 1500);
+                } else {
+                    showToast('Extraction finished (no data change)', 'var(--amber)', 4000);
+                    const btn = document.getElementById('syncBtn');
+                    btn.disabled = false;
+                    btn.innerHTML = '&#x21BB; Sync';
+                }
+            }
+        } catch(e) {}
+    }, 3000);
+}
+
+async function toggleAutoSync(on) {
+    if (on) {
+        try {
+            await fetch('/api/watch-start');
+            showToast('Auto-sync enabled — saves in Excel will auto-update', 'var(--green)', 3000);
+            startPolling();
+        } catch(e) {
+            showToast('Server not reachable', 'var(--rust)', 4000);
+            document.getElementById('autoWatch').checked = false;
+        }
+    } else {
+        try { await fetch('/api/watch-stop'); } catch(e) {}
+        stopPolling();
+        showToast('Auto-sync disabled', 'var(--forest)', 2000);
+    }
+}
+
+function startPolling() {
+    if (_autoSyncTimer) return;
+    fetch('/api/data-mtime').then(r=>r.json()).then(d => { _lastDataMtime = d.mtime; });
+    _autoSyncTimer = setInterval(async () => {
+        try {
+            const res = await fetch('/api/data-mtime');
+            const d = await res.json();
+            if (d.mtime > _lastDataMtime && _lastDataMtime > 0) {
+                _lastDataMtime = d.mtime;
+                showToast('Data updated — reloading dashboard...', 'var(--green)', 2000);
+                setTimeout(() => window.location.reload(), 1500);
+            }
+        } catch(e) {}
+    }, 4000);
+}
+
+function stopPolling() {
+    if (_autoSyncTimer) { clearInterval(_autoSyncTimer); _autoSyncTimer = null; }
+}
+
+async function checkServerStatus() {
+    try {
+        const res = await fetch('/api/status');
+        const data = await res.json();
+        const span = document.getElementById('fileStatus');
+        if (data.excelExists) {
+            span.textContent = data.excelName;
+            span.title = 'Linked: ' + data.excelName;
+        } else {
+            span.textContent = 'Excel not found';
+            span.title = 'File not found at expected path';
+        }
+        if (data.watching) {
+            document.getElementById('autoWatch').checked = true;
+            startPolling();
+        }
+        if (data.tunnelUrl) {
+            let linkEl = document.getElementById('tunnelLink');
+            if (!linkEl) {
+                linkEl = document.createElement('a');
+                linkEl.id = 'tunnelLink';
+                linkEl.style.cssText = 'font:11px Calibri;color:var(--ltTeal);margin-left:8px;text-decoration:underline;cursor:pointer';
+                linkEl.title = 'Click to copy public URL';
+                linkEl.onclick = function(e) { e.preventDefault(); navigator.clipboard.writeText(data.tunnelUrl); showToast('Public URL copied!','var(--green)',2000); };
+                document.getElementById('excelControls').appendChild(linkEl);
+            }
+            linkEl.textContent = '🔗 Share Link';
+            linkEl.href = data.tunnelUrl;
+        }
+    } catch(e) {
+        document.getElementById('fileStatus').textContent = 'Server offline';
+    }
+}
+
+checkServerStatus();
+
+// ==================== INIT ====================
+loadData();
+if (location.hash) {
+    const parts = location.hash.slice(1).split(',');
+    const t = parts[0]; const scrollY = parseInt(parts[1])||0;
+    const pg = document.getElementById('page-'+t);
+    if (pg) { switchTab(t); if (scrollY) setTimeout(()=>window.scrollTo(0,scrollY),500); }
+}
+</script>
+</body>
+</html>
