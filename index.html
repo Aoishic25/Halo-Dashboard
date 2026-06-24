@@ -2032,24 +2032,30 @@ function renderInventory() {
     if (hasShData) {
         const hubNames = [...new Set(sh.map(r => r.Hub||''))].filter(Boolean);
         const shYears = [...new Set(sh.map(r => r.Year||''))].filter(Boolean).sort();
+        const daysInMonth = (mo, yr) => new Date(yr, mo, 0).getDate();
         const shLabels = []; const shData = {};
         hubNames.forEach(h => { shData[h] = []; });
         shYears.forEach(y => {
-            shMonths.forEach(m => {
-                shLabels.push(`${m.substring(0,3)}-${String(y).slice(-2)}`);
+            shMonths.forEach((m, mi) => {
+                const days = daysInMonth(mi + 1, parseInt(y));
+                shLabels.push(`1-${days} ${m.substring(0,3)}'${String(y).slice(-2)}`);
                 hubNames.forEach(h => {
                     const row = sh.find(r => r.Year == y && r.Hub === h);
                     shData[h].push(row ? num(row[m]) : 0);
                 });
             });
         });
-        const shSlice = shLabels.length > 24 ? shLabels.length - 24 : 0;
+        // Trim trailing empty months
+        let lastNonZero = shLabels.length - 1;
+        while (lastNonZero > 0 && hubNames.every(h => shData[h][lastNonZero] === 0)) lastNonZero--;
+        const trimEnd = lastNonZero + 1;
+        const shSlice = trimEnd > 24 ? trimEnd - 24 : 0;
         makeChart('chartStorageHub', {
             type: 'line',
             data: {
-                labels: shLabels.slice(shSlice),
+                labels: shLabels.slice(shSlice, trimEnd),
                 datasets: hubNames.map((h,i) => ({
-                    label: h, data: shData[h].slice(shSlice),
+                    label: h, data: shData[h].slice(shSlice, trimEnd),
                     borderColor: COLORS.set[i], backgroundColor: COLORS.set[i]+'15', fill: false, tension: .3, pointRadius: 3, pointHoverRadius: 6, borderWidth: 2
                 }))
             },
