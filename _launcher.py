@@ -201,8 +201,12 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == '/' or self.path == '':
-            self.send_response(302)
-            self.send_header('Location', '/HALO_Dashboard.html')
+            if os.path.exists(os.path.join(ROOT, 'index.html')):
+                self.send_response(302)
+                self.send_header('Location', '/index.html')
+            else:
+                self.send_response(302)
+                self.send_header('Location', '/HALO_Dashboard.html')
             self.end_headers()
             return
         elif self.path == '/api/status':

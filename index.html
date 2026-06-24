@@ -1148,8 +1148,6 @@ document.getElementById('navBar').addEventListener('click', e => {
 // ==================== INIT DASHBOARD ====================
 function initDashboard() {
     populateFilters();
-    autoSelectLatestMonth();
-    applyGlobalFilter();
     renderExecutive();
     renderedTabs.add('executive');
 }
@@ -1317,7 +1315,7 @@ function renderExecutive() {
     document.getElementById('execCards').innerHTML =
         makeCard('Inbound Cases', fmt(num(latest.Inbound)), latest.Month || 'Latest', parseFloat(inbTrend), 'clickable') +
         makeCard('Outbound Cases', fmt(num(latest.Outbound)), latest.Month || 'Latest', parseFloat(outTrend), 'clickable') +
-        makeCard('Closing Stock', fmt(num(latest['Closing Stock'])), 'Units in warehouse', null, 'clickable') +
+        makeCard('Closing Stock', fmt(num(latest['Closing Stock'])), 'Cases in warehouse', null, 'clickable') +
         makeCard('Total Cost', fmt(num(latestCost['Total price (AED)'])) + ' AED', latestCost['Month-Year'] || '', parseFloat(costTrend), 'clickable orange') +
         makeCard('Quality Issues', String(qi.length), 'Total logged issues', null, 'clickable') +
         makeCard('Waiting Charges', fmt(sumArr(wc.slice(-3), 'Total')) + ' AED', 'Last 3 months', null, 'clickable orange');
@@ -1564,12 +1562,20 @@ function renderWarehouse() {
         _h:'420px'
     });
 
-    // Truck Turnaround (histogram) — Turnover Time is a decimal fraction of a day
     const turnBuckets = {'< 1h':0,'1-2h':0,'2-3h':0,'3-4h':0,'4-5h':0,'> 5h':0};
     ttFiltered.forEach(r => {
-        const t = parseFloat(r['Turnover Time']);
-        if (isNaN(t) || t <= 0) return;
-        const hrs = t * 24;
+        const raw = String(r['Turnover Time']||'').trim();
+        if (!raw) return;
+        let hrs;
+        const timeParts = raw.match(/^(\d+):(\d+)(?::(\d+))?$/);
+        if (timeParts) {
+            hrs = parseInt(timeParts[1]) + parseInt(timeParts[2])/60 + (parseInt(timeParts[3]||0))/3600;
+        } else {
+            const t = parseFloat(raw);
+            if (isNaN(t) || t <= 0) return;
+            hrs = t < 1 ? t * 24 : t;
+        }
+        if (hrs <= 0) return;
         if (hrs < 1) turnBuckets['< 1h']++;
         else if (hrs < 2) turnBuckets['1-2h']++;
         else if (hrs < 3) turnBuckets['2-3h']++;
