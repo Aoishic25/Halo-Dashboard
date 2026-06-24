@@ -1,0 +1,28 @@
+# Secrets
+.groq_key
+
+# Binary / build artifacts
+*.exe
+*.pyc
+*.spec
+__pycache__/
+build/
+dist/
+
+# Excel files (large, contain business data)
+Ops files/
+~$*
+
+# IDE / tool config
+.claude/
+.vs/
+.vscode/
+
+# Old/unused files
+halo_agent.py
+dashboard_embed.js
+cloudflared.exe
+
+# OS files
+desktop.ini
+Thumbs.db
