@@ -198,6 +198,7 @@ tbody td:first-child{font-weight:700;color:var(--teal)}
 
 <!-- NAV -->
 <div class="nav" id="navBar">
+<button data-tab="kpi">KPI</button>
 <button class="active" data-tab="executive">Executive Overview</button>
 <button data-tab="warehouse">Warehouse Operations</button>
 <button data-tab="inventory">Inventory &amp; Storage</button>
@@ -224,6 +225,29 @@ tbody td:first-child{font-weight:700;color:var(--teal)}
 </div>
 <div id="uploadStatus" style="margin-top:12px;font-size:13px;color:var(--teal);display:none"></div>
 <button class="process" id="processBtn" style="display:none" onclick="processUpload()">Process &amp; Refresh Dashboard</button>
+</div>
+</div>
+
+<!-- ========== TAB: KPI ========== -->
+<div class="page" id="page-kpi">
+<div class="page-title">Key Performance Indicators</div>
+<div class="page-sub">Warehousing &amp; Transportation KPIs &mdash; Latest Month</div>
+<div class="filter-bar" style="margin:12px 0 0">
+<label>REGION</label><select id="kpiRegion" onchange="renderKPI()"><option value="all">All Regions</option></select>
+</div>
+
+<div class="section-divider">Warehousing</div>
+<div class="card-row" id="kpiWhCards"></div>
+<div class="chart-row">
+<div class="chart-box"><h3>Monthly Warehousing KPI Trend</h3><canvas id="chartKpiWhTrend"></canvas></div>
+<div class="chart-box"><h3>Cost Breakdown (Latest Month)</h3><canvas id="chartKpiCostBreak"></canvas></div>
+</div>
+
+<div class="section-divider">Transportation</div>
+<div class="card-row" id="kpiTrCards"></div>
+<div class="chart-row">
+<div class="chart-box"><h3>Freight Cost Trend</h3><canvas id="chartKpiFreightTrend"></canvas></div>
+<div class="chart-box"><h3>Shipments by Country (Latest Month)</h3><canvas id="chartKpiCountry"></canvas></div>
 </div>
 </div>
 
@@ -1126,11 +1150,12 @@ function switchTab(tabId) {
     // Lazy-render: create charts only when tab first becomes visible
     if (!renderedTabs.has(tabId)) {
         renderedTabs.add(tabId);
-        requestAnimationFrame(() => renderTab(tabId));
+        setTimeout(() => renderTab(tabId), 0);
     }
 }
 function renderTab(tabId) {
     const map = {
+        kpi: renderKPI,
         warehouse: renderWarehouse,
         inventory: renderInventory,
         quality: renderQuality,
@@ -1287,6 +1312,206 @@ function gf(arr, dateKey) {
     const filt = getGlobalFilter();
     if (!filt) return arr || [];
     return (arr || []).filter(r => filt(r[dateKey]));
+}
+
+// ==================== KPI TAB ====================
+function populateKpiRegion() {
+    const sel = document.getElementById('kpiRegion');
+    if (!sel) return;
+    const hubs = new Set();
+    (DATA.costingDet||[]).forEach(r => { if (r.Hub) hubs.add(r.Hub); });
+    const sorted = [...hubs].sort();
+    const prev = sel.value;
+    sel.innerHTML = '<option value="all">All Regions</option>';
+    sorted.forEach(h => { const o = document.createElement('option'); o.value = h; o.text = h; sel.appendChild(o); });
+    if (prev !== 'all' && sorted.includes(prev)) sel.value = prev;
+}
+
+const kpiCharts = {};
+function renderKPI() {
+    populateKpiRegion();
+    const region = (document.getElementById('kpiRegion')||{}).value || 'all';
+
+    // -- Warehousing data --
+    const sfAll = gf(DATA.stockFlow, 'Month');
+    const sf = sfAll.filter(r => num(r.Inbound) > 0 || num(r.Outbound) > 0);
+    const ccAll = gf(DATA.costingCases, 'Month-Year');
+    let cdAll = gf(DATA.costingDet, 'Month-Year').filter(r => num(r['Total price (AED)']) > 0);
+    if (region !== 'all') cdAll = cdAll.filter(r => r.Hub === region);
+    const dmAll = gf(DATA.damages||[], 'Month');
+    const ttAll = gf(DATA.truckTurnover||[], 'Month');
+    const qi = gf(DATA.qualityIssues||[], 'Month');
+    const wc = gf(DATA.waitingCharges||[], 'Month');
+
+    // Latest month values
+    const latestSF = sf.length ? sf[sf.length-1] : {};
+    const latestCC = ccAll.length ? ccAll[ccAll.length-1] : {};
+
+    // Aggregate cost by month
+    const cdMap = {};
+    cdAll.forEach(r => {
+        const mk = r['Month-Year'];
+        if (!cdMap[mk]) cdMap[mk] = {m: mk, cost: 0, cases: 0};
+        cdMap[mk].cost += num(r['Total price (AED)']);
+        if (num(r['Total Cases'])) cdMap[mk].cases = num(r['Total Cases']);
+    });
+    const cdMonths = Object.values(cdMap).sort((a,b) => {
+        const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        const pa = a.m.split('-'), pb = b.m.split('-');
+        return (parseInt('20'+pa[1])*100 + months.indexOf(pa[0])) - (parseInt('20'+pb[1])*100 + months.indexOf(pb[0]));
+    });
+    const latestCost = cdMonths.length ? cdMonths[cdMonths.length-1] : {cost:0, cases:0, m:'-'};
+    const prevCost = cdMonths.length > 1 ? cdMonths[cdMonths.length-2] : null;
+    const costPct = prevCost && prevCost.cost ? ((latestCost.cost - prevCost.cost)/prevCost.cost*100).toFixed(1) : null;
+    const costPerCase = latestCost.cases ? (latestCost.cost / latestCost.cases).toFixed(2) : '-';
+
+    // Damage rate
+    let dmgRate = '-';
+    if (dmAll.length) {
+        const lastDm = dmAll[dmAll.length-1];
+        const grn = num(lastDm['GRN Qty in Cases']);
+        const dmg = num(lastDm['Damaged / Short Units Qty in cases']);
+        if (grn > 0) dmgRate = (dmg/grn*100).toFixed(2) + '%';
+    }
+
+    // Avg turnaround
+    let avgTT = '-';
+    if (ttAll.length) {
+        let totalH = 0, cnt = 0;
+        ttAll.forEach(r => {
+            const raw = String(r['Turnover Time']||'').trim();
+            if (!raw) return;
+            const tp = raw.match(/^(\d+):(\d+)(?::(\d+))?$/);
+            if (tp) { totalH += parseInt(tp[1]) + parseInt(tp[2])/60; cnt++; }
+        });
+        if (cnt) avgTT = (totalH/cnt).toFixed(1) + 'h';
+    }
+
+    // Pick & Pack from costingCases
+    const ppVal = latestCC['Pick & Pack'] ? fmt(num(latestCC['Pick & Pack'])) : '-';
+
+    // Warehousing KPI cards
+    const whCards = [
+        {title:'Inbound Cases', val: fmt(num(latestSF.Inbound)), sub: latestSF.Month || '-'},
+        {title:'Outbound Cases', val: fmt(num(latestSF.Outbound)), sub: latestSF.Month || '-'},
+        {title:'Closing Stock', val: fmt(num(latestSF['Closing Stock'])), sub: 'Cases in warehouse'},
+        {title:'Total Cost', val: fmt(latestCost.cost)+' AED', sub: latestCost.m, pct: costPct},
+        {title:'Cost per Case', val: costPerCase + ' AED', sub: latestCost.m},
+        {title:'Damage Rate', val: dmgRate, sub: 'Latest month'},
+        {title:'Avg Turnaround', val: avgTT, sub: 'Truck turnaround'},
+        {title:'Quality Issues', val: fmt(qi.length), sub: 'Logged issues'},
+        {title:'Pick & Pack', val: ppVal, sub: 'Latest month'}
+    ];
+    document.getElementById('kpiWhCards').innerHTML = whCards.map(c => {
+        let pctHtml = '';
+        if (c.pct !== undefined && c.pct !== null) {
+            const up = parseFloat(c.pct) >= 0;
+            pctHtml = `<div style="font-size:13px;color:${up?'#e74c3c':'#27ae60'};font-weight:600">${up?'▲':'▼'} ${Math.abs(parseFloat(c.pct))}%</div>`;
+        }
+        return `<div class="kpi-card"><div class="kpi-title">${c.title}</div><div class="kpi-val">${c.val}</div><div class="kpi-sub">${c.sub}</div>${pctHtml}</div>`;
+    }).join('');
+
+    // -- Transportation data --
+    const frAll = gf(DATA.freights||[], 'Month');
+    const latestMonth = frAll.length ? frAll[frAll.length-1].Month : null;
+    const frLatest = latestMonth ? frAll.filter(r => r.Month === latestMonth) : [];
+
+    let totalFreight = 0, totalCasesFr = 0, totalTrucks = 0, totalPallets = 0;
+    frLatest.forEach(r => {
+        totalFreight += num(r['Total Freight']);
+        totalCasesFr += num(r['Total Cases']);
+        totalTrucks += num(r['Total Trucks']);
+        totalPallets += num(r['Total Pallets']);
+    });
+
+    const freightPerCase = totalCasesFr ? (totalFreight/totalCasesFr).toFixed(2) : '-';
+    const casesPerTruck = totalTrucks ? Math.round(totalCasesFr/totalTrucks) : '-';
+    const palletsPerTruck = totalTrucks ? (totalPallets/totalTrucks).toFixed(1) : '-';
+    const countries = new Set(frLatest.map(r => r.Country).filter(Boolean));
+
+    // Waiting charges total
+    let wcTotal = 0;
+    wc.forEach(r => wcTotal += num(r['Total Charges AED'] || r['Waiting Charges'] || r['Total'] || 0));
+
+    const trCards = [
+        {title:'Total Freight', val: fmt(totalFreight)+' AED', sub: latestMonth || '-'},
+        {title:'Freight/Case', val: freightPerCase + ' AED', sub: latestMonth || '-'},
+        {title:'Total Trucks', val: fmt(totalTrucks), sub: latestMonth || '-'},
+        {title:'Cases/Truck', val: fmt(casesPerTruck), sub: latestMonth || '-'},
+        {title:'Pallets/Truck', val: palletsPerTruck, sub: latestMonth || '-'},
+        {title:'Countries', val: countries.size, sub: 'Active destinations'},
+        {title:'Total Pallets', val: fmt(totalPallets), sub: latestMonth || '-'},
+        {title:'Waiting Charges', val: fmt(wcTotal)+' AED', sub: 'Filtered period'}
+    ];
+    document.getElementById('kpiTrCards').innerHTML = trCards.map(c =>
+        `<div class="kpi-card"><div class="kpi-title">${c.title}</div><div class="kpi-val">${c.val}</div><div class="kpi-sub">${c.sub}</div></div>`
+    ).join('');
+
+    // -- Charts --
+    // Warehousing trend: Inbound, Outbound, Closing Stock per month
+    const sfMonths = sf.map(r => r.Month);
+    const sfInb = sf.map(r => num(r.Inbound));
+    const sfOut = sf.map(r => num(r.Outbound));
+    const sfClose = sf.map(r => num(r['Closing Stock']));
+
+    if (kpiCharts.whTrend) kpiCharts.whTrend.destroy();
+    kpiCharts.whTrend = new Chart(document.getElementById('chartKpiWhTrend'), {
+        type:'line', data:{labels: sfMonths, datasets:[
+            {label:'Inbound', data:sfInb, borderColor:'#1abc9c', backgroundColor:'rgba(26,188,156,0.1)', fill:true, tension:0.3},
+            {label:'Outbound', data:sfOut, borderColor:'#e74c3c', backgroundColor:'rgba(231,76,60,0.1)', fill:true, tension:0.3},
+            {label:'Closing Stock', data:sfClose, borderColor:'#3498db', borderDash:[5,5], fill:false, tension:0.3, yAxisID:'y1'}
+        ]},
+        options:{responsive:true, interaction:{mode:'index',intersect:false}, scales:{
+            y:{title:{display:true,text:'Cases'},ticks:{callback:v=>fmt(v)}},
+            y1:{position:'right',title:{display:true,text:'Stock'},grid:{drawOnChartArea:false},ticks:{callback:v=>fmt(v)}}
+        }}
+    });
+
+    // Cost breakdown: Handling IN, Handling OUT, Pick & Pack, Storage from costingCases latest
+    const hIn = num(latestCC['Handling IN']);
+    const hOut = num(latestCC['Handling Out']);
+    const pp = num(latestCC['Pick & Pack']);
+    const stor = num(latestCC['Pallets Storage']);
+    if (kpiCharts.costBreak) kpiCharts.costBreak.destroy();
+    kpiCharts.costBreak = new Chart(document.getElementById('chartKpiCostBreak'), {
+        type:'doughnut', data:{labels:['Handling IN','Handling Out','Pick & Pack','Pallet Storage'],
+        datasets:[{data:[hIn,hOut,pp,stor], backgroundColor:['#1abc9c','#e74c3c','#3498db','#f39c12']}]},
+        options:{responsive:true, plugins:{legend:{position:'bottom'}}}
+    });
+
+    // Freight cost trend by month
+    const frMonthMap = {};
+    frAll.forEach(r => {
+        const m = r.Month;
+        if (!frMonthMap[m]) frMonthMap[m] = 0;
+        frMonthMap[m] += num(r['Total Freight']);
+    });
+    const frLabels = Object.keys(frMonthMap);
+    const frVals = Object.values(frMonthMap);
+
+    if (kpiCharts.freightTrend) kpiCharts.freightTrend.destroy();
+    kpiCharts.freightTrend = new Chart(document.getElementById('chartKpiFreightTrend'), {
+        type:'bar', data:{labels:frLabels, datasets:[
+            {label:'Total Freight (AED)', data:frVals, backgroundColor:'rgba(52,152,219,0.7)', borderColor:'#3498db', borderWidth:1}
+        ]},
+        options:{responsive:true, scales:{y:{ticks:{callback:v=>fmt(v)}}}}
+    });
+
+    // Shipments by country (latest month)
+    const countryMap = {};
+    frLatest.forEach(r => {
+        const c = r.Country || 'Unknown';
+        countryMap[c] = (countryMap[c]||0) + num(r['Total Cases']);
+    });
+    const cLabels = Object.keys(countryMap).sort((a,b) => countryMap[b]-countryMap[a]).slice(0,12);
+    const cVals = cLabels.map(l => countryMap[l]);
+    const cColors = ['#1abc9c','#e74c3c','#3498db','#f39c12','#9b59b6','#2ecc71','#e67e22','#1abc9c','#34495e','#16a085','#c0392b','#2980b9'];
+
+    if (kpiCharts.country) kpiCharts.country.destroy();
+    kpiCharts.country = new Chart(document.getElementById('chartKpiCountry'), {
+        type:'bar', data:{labels:cLabels, datasets:[{label:'Cases', data:cVals, backgroundColor:cColors}]},
+        options:{responsive:true, indexAxis:'y', scales:{x:{ticks:{callback:v=>fmt(v)}}}}
+    });
 }
 
 // ==================== EXECUTIVE OVERVIEW ====================
