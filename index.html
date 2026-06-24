@@ -248,8 +248,10 @@ tbody td:first-child{font-weight:700;color:var(--teal)}
 .kpi-trend.up{color:#1a9d5c}
 .kpi-trend.down{color:#d33}
 .kpi-trend.flat{color:#888}
-.kpi-section-label{font-size:11px;font-weight:700;color:#fff;background:var(--teal);padding:6px 14px;border-radius:4px;display:inline-block;margin:0;text-transform:uppercase;letter-spacing:1px}
-.kpi-tbl tbody tr.kpi-section-row td{background:#f5f7fa;padding:10px 16px;border:none}
+.kpi-section-label{font-size:15px;font-weight:700;color:var(--deep);margin:0 0 2px;display:flex;align-items:center;gap:10px}
+.kpi-section-label::before{content:'';width:4px;height:22px;background:var(--teal);border-radius:2px;display:inline-block}
+.kpi-section-sub{font-size:12px;color:#999;margin-bottom:12px}
+.kpi-section{background:#fff;border-radius:10px;padding:24px 28px;margin:0 0 24px;box-shadow:0 2px 12px rgba(0,0,0,.06);border:1px solid #eef0f4}
 </style>
 
 <div class="page-title">Key Performance Indicators</div>
@@ -258,12 +260,24 @@ tbody td:first-child{font-weight:700;color:var(--teal)}
 <label>REGION</label><select id="kpiRegion" onchange="renderKPI()"><option value="all">All Regions</option></select>
 </div>
 
-<div class="kpi-dashboard" id="kpiDashboard">
-<h2>Executive Dashboard <span style="font-weight:400;font-size:15px;color:#888">(Management Review)</span></h2>
-<div class="kpi-sub-head" id="kpiPeriodLabel">Latest Month</div>
+<div style="margin:16px 0 8px">
+<h2 style="font-size:22px;font-weight:700;color:#1a1a2e;margin:0 0 4px">Executive Dashboard <span style="font-weight:400;font-size:15px;color:#888">(Management Review)</span></h2>
+<div style="font-size:13px;color:#888;margin-bottom:4px" id="kpiPeriodLabel">Latest Month</div>
+</div>
+<div class="kpi-section" id="kpiWhSection">
+<div class="kpi-section-label">Warehousing</div>
+<div class="kpi-section-sub">Inventory, storage, handling &amp; quality metrics</div>
 <table class="kpi-tbl">
 <thead><tr><th style="width:30%">KPI</th><th style="width:18%">Target</th><th style="width:18%">Actual</th><th style="width:14%">Status</th><th style="width:20%">Trend</th></tr></thead>
-<tbody id="kpiTableBody"></tbody>
+<tbody id="kpiWhBody"></tbody>
+</table>
+</div>
+<div class="kpi-section" id="kpiTrSection">
+<div class="kpi-section-label">Transportation</div>
+<div class="kpi-section-sub">Freight, logistics &amp; delivery metrics</div>
+<table class="kpi-tbl">
+<thead><tr><th style="width:30%">KPI</th><th style="width:18%">Target</th><th style="width:18%">Actual</th><th style="width:14%">Status</th><th style="width:20%">Trend</th></tr></thead>
+<tbody id="kpiTrBody"></tbody>
 </table>
 </div>
 
@@ -1477,12 +1491,7 @@ function renderKPI() {
     function row(name, target, actual, status, trend) {
         return `<tr><td class="kpi-name">${name}</td><td>${target}</td><td style="font-weight:600">${actual}</td><td><span class="kpi-status ${status}">${status==='green'?'On Target':status==='amber'?'Warning':status==='red'?'Below Target':'N/A'}</span></td><td>${trend}</td></tr>`;
     }
-    function sectionRow(label) {
-        return `<tr class="kpi-section-row"><td colspan="5"><span class="kpi-section-label">${label}</span></td></tr>`;
-    }
-
-    const rows = [
-        sectionRow('Warehousing'),
+    const whRows = [
         row('Inbound Cases', 'Track', fmt(num(latestSF.Inbound)), 'grey', kpiTrendHtml(num(latestSF.Inbound), num(prevSF.Inbound))),
         row('Outbound Cases', 'Track', fmt(num(latestSF.Outbound)), 'grey', kpiTrendHtml(num(latestSF.Outbound), num(prevSF.Outbound))),
         row('Closing Stock', 'Track', fmt(num(latestSF['Closing Stock'])), 'grey', kpiTrendHtml(num(latestSF['Closing Stock']), num(prevSF['Closing Stock']))),
@@ -1492,7 +1501,8 @@ function renderKPI() {
         row('Dock-to-Stock Time', '< 24 hrs', avgTTVal !== '-' ? avgTTVal + ' hrs' : '-', kpiStatus(avgTTVal, '<24'), kpiTrendHtml(avgTTVal, null)),
         row('Quality Issues', 'Zero', fmt(qi.length), qi.length === 0 ? 'green' : qi.length < 50 ? 'amber' : 'red', '<span class="kpi-trend flat">' + qi.length + ' logged</span>'),
         row('Pick & Pack', 'Track', latestCC['Pick & Pack'] ? fmt(num(latestCC['Pick & Pack'])) : '-', 'grey', kpiTrendHtml(num(latestCC['Pick & Pack']), ccAll.length > 1 ? num(ccAll[ccAll.length-2]['Pick & Pack']) : null)),
-        sectionRow('Transportation'),
+    ];
+    const trRows = [
         row('Total Freight (AED)', 'Track', fmt(totalFreight), 'grey', kpiTrendHtml(totalFreight, prevFreight || null)),
         row('Freight per Case (AED)', 'Trend Downward', freightPerCase, kpiStatus(prevFreightPerCase !== '-' ? parseFloat(freightPerCase) - parseFloat(prevFreightPerCase) : 0, '<0', true), kpiTrendHtml(freightPerCase, prevFreightPerCase)),
         row('Total Trucks', 'Track', fmt(totalTrucks), 'grey', kpiTrendHtml(totalTrucks, prevTrucks || null)),
@@ -1502,7 +1512,8 @@ function renderKPI() {
         row('Waiting Charges (AED)', 'Minimize', fmt(wcTotal), wcTotal === 0 ? 'green' : wcTotal < 10000 ? 'amber' : 'red', '<span class="kpi-trend flat">' + fmt(wcTotal) + '</span>'),
     ];
 
-    document.getElementById('kpiTableBody').innerHTML = rows.join('');
+    document.getElementById('kpiWhBody').innerHTML = whRows.join('');
+    document.getElementById('kpiTrBody').innerHTML = trRows.join('');
 
     // -- Charts --
     const sfMonths = sf.map(r => r.Month);
