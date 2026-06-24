@@ -231,6 +231,9 @@ tbody td:first-child{font-weight:700;color:var(--teal)}
 <div class="page active" id="page-executive">
 <div class="page-title">Executive Overview</div>
 <div class="page-sub">Current Month Summary &mdash; METAP Warehousing Operations</div>
+<div class="filter-bar" style="margin:12px 0 0">
+<label>REGION</label><select id="execRegion" onchange="renderExecutive()"><option value="all">All Regions</option></select>
+</div>
 
 <div class="callout">
 <div class="badge">!</div>
@@ -270,7 +273,7 @@ tbody td:first-child{font-weight:700;color:var(--teal)}
 <div class="filter-bar">
 <label>Vendor</label><select id="whVendor" onchange="reRenderWarehouse()"><option value="all">All Vendors</option></select>
 <label>Site (GRN)</label><select id="whGrnSite" onchange="reRenderWarehouse()"><option value="all">All Sites</option></select>
-<label>Site (Truck)</label><select id="whTruckSite" onchange="reRenderWarehouse()"><option value="all">All</option></select>
+<label>Entity</label><select id="whTruckSite" onchange="reRenderWarehouse()"><option value="all">All</option></select>
 <button class="filter-reset" onclick="resetWhFilter()">Reset</button>
 </div>
 
@@ -1148,8 +1151,21 @@ document.getElementById('navBar').addEventListener('click', e => {
 // ==================== INIT DASHBOARD ====================
 function initDashboard() {
     populateFilters();
+    populateExecRegion();
     renderExecutive();
     renderedTabs.add('executive');
+}
+
+function populateExecRegion() {
+    const sel = document.getElementById('execRegion');
+    if (!sel) return;
+    const hubs = new Set();
+    (DATA.costingDet||[]).forEach(r => { if (r.Hub) hubs.add(r.Hub); });
+    const sorted = [...hubs].sort();
+    const prev = sel.value;
+    sel.innerHTML = '<option value="all">All Regions</option>';
+    sorted.forEach(h => { const o = document.createElement('option'); o.value = h; o.text = h; sel.appendChild(o); });
+    if (prev !== 'all' && sorted.includes(prev)) sel.value = prev;
 }
 
 function autoSelectLatestMonth() {
@@ -1275,9 +1291,11 @@ function gf(arr, dateKey) {
 
 // ==================== EXECUTIVE OVERVIEW ====================
 function renderExecutive() {
+    const region = (document.getElementById('execRegion')||{}).value || 'all';
     const sfRaw = gf(DATA.stockFlow, 'Month');
     const sf = sfRaw.filter(r => r.Inbound && String(r.Inbound).trim() !== '' && num(r.Inbound) > 0);
-    const cdRaw = gf(DATA.costingDet, 'Month-Year').filter(r => num(r['Total price (AED)']) > 0);
+    let cdRaw = gf(DATA.costingDet, 'Month-Year').filter(r => num(r['Total price (AED)']) > 0);
+    if (region !== 'all') cdRaw = cdRaw.filter(r => r.Hub === region);
     const cdMap = {};
     cdRaw.forEach(r => {
         const mk = r['Month-Year'];
