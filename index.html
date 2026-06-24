@@ -1148,6 +1148,8 @@ document.getElementById('navBar').addEventListener('click', e => {
 // ==================== INIT DASHBOARD ====================
 function initDashboard() {
     populateFilters();
+    autoSelectLatestMonth();
+    applyGlobalFilter();
     renderExecutive();
     renderedTabs.add('executive');
 }
