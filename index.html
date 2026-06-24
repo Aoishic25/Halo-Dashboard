@@ -2033,33 +2033,56 @@ function renderInventory() {
         const hubNames = [...new Set(sh.map(r => r.Hub||''))].filter(Boolean);
         const shYears = [...new Set(sh.map(r => r.Year||''))].filter(Boolean).sort();
         const daysInMonth = (mo, yr) => new Date(yr, mo, 0).getDate();
-        const shLabels = []; const shData = {};
-        hubNames.forEach(h => { shData[h] = []; });
-        shYears.forEach(y => {
-            shMonths.forEach((m, mi) => {
-                const days = daysInMonth(mi + 1, parseInt(y));
-                shLabels.push(`1-${days} ${m.substring(0,3)}'${String(y).slice(-2)}`);
-                hubNames.forEach(h => {
-                    const row = sh.find(r => r.Year == y && r.Hub === h);
-                    shData[h].push(row ? num(row[m]) : 0);
+        const gFilt = getGlobalFilter();
+        const selMonth = document.getElementById('globalMonth').value;
+        const selYear = document.getElementById('globalYear').value;
+        const isMonthSelected = selMonth && selMonth !== 'all' && selYear && selYear !== 'all';
+
+        let shFinalLabels, shFinalData;
+
+        if (isMonthSelected) {
+            const mi = shMonths.findIndex(m => m.substring(0,3).toLowerCase() === selMonth.substring(0,3).toLowerCase());
+            const mName = mi >= 0 ? shMonths[mi] : '';
+            const days = daysInMonth(mi + 1, parseInt(selYear));
+            shFinalLabels = Array.from({length: days}, (_, i) => String(i + 1));
+            shFinalData = {};
+            hubNames.forEach(h => {
+                const row = sh.find(r => r.Year == selYear && r.Hub === h);
+                const monthTotal = row ? num(row[mName]) : 0;
+                const daily = monthTotal / days;
+                shFinalData[h] = Array(days).fill(Math.round(daily * 100) / 100);
+            });
+        } else {
+            shFinalLabels = []; shFinalData = {};
+            hubNames.forEach(h => { shFinalData[h] = []; });
+            shYears.forEach(y => {
+                shMonths.forEach((m) => {
+                    shFinalLabels.push(`${m.substring(0,3)}'${String(y).slice(-2)}`);
+                    hubNames.forEach(h => {
+                        const row = sh.find(r => r.Year == y && r.Hub === h);
+                        shFinalData[h].push(row ? num(row[m]) : 0);
+                    });
                 });
             });
-        });
-        // Trim trailing empty months
-        let lastNonZero = shLabels.length - 1;
-        while (lastNonZero > 0 && hubNames.every(h => shData[h][lastNonZero] === 0)) lastNonZero--;
-        const trimEnd = lastNonZero + 1;
-        const shSlice = trimEnd > 24 ? trimEnd - 24 : 0;
+            // Trim trailing empty months
+            let lastNonZero = shFinalLabels.length - 1;
+            while (lastNonZero > 0 && hubNames.every(h => shFinalData[h][lastNonZero] === 0)) lastNonZero--;
+            const trimEnd = lastNonZero + 1;
+            const shSlice = trimEnd > 24 ? trimEnd - 24 : 0;
+            shFinalLabels = shFinalLabels.slice(shSlice, trimEnd);
+            hubNames.forEach(h => { shFinalData[h] = shFinalData[h].slice(shSlice, trimEnd); });
+        }
+
         makeChart('chartStorageHub', {
             type: 'line',
             data: {
-                labels: shLabels.slice(shSlice, trimEnd),
+                labels: shFinalLabels,
                 datasets: hubNames.map((h,i) => ({
-                    label: h, data: shData[h].slice(shSlice, trimEnd),
+                    label: h, data: shFinalData[h],
                     borderColor: COLORS.set[i], backgroundColor: COLORS.set[i]+'15', fill: false, tension: .3, pointRadius: 3, pointHoverRadius: 6, borderWidth: 2
                 }))
             },
-            options:{scales:{y:{ticks:{callback:v=>fmt(v)}},x:{ticks:{maxRotation:45,font:{size:10}}}}}
+            options:{scales:{y:{ticks:{callback:v=>fmt(v)}},x:{ticks:{maxRotation:0,font:{size:11}},title:{display:isMonthSelected,text:isMonthSelected?`Day of ${selMonth} ${selYear}`:''}}}}
         });
     } else {
         const el = document.getElementById('chartStorageHub');
