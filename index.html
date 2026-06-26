@@ -2155,41 +2155,42 @@ function renderInventory() {
         exTb.innerHTML += `<tr><td>${r.No||''}</td><td>${(r.Description||'').substring(0,45)}</td><td>${r['MFD Date']||''}</td><td>${r['Expiry Date']||''}</td><td>${r['Pack Size']||''}</td><td>${r['Sum of Total Quantity']||''}</td><td style="${shelfClass}">${shelfStr}</td><td>${agingStr}</td><td>${r['Month Name']||''}</td></tr>`;
     });
 
-    // Aging Analysis
-    const paData = DATA.palletAging || [];
-    const paMonths = [...new Set(paData.map(r => r.Month).filter(Boolean))].sort((a,b) => {
+    // Aging Analysis (filtered by global month/year)
+    const paFiltered = gf(DATA.palletAging || [], 'Month');
+    const sortMonth = (a,b) => {
         const mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
         const pa2 = a.split('-'), pb2 = b.split('-');
         return (parseInt('20'+pa2[1])*100 + mo.indexOf(pa2[0])) - (parseInt('20'+pb2[1])*100 + mo.indexOf(pb2[0]));
-    });
+    };
+    const paMonths = [...new Set(paFiltered.map(r => r.Month).filter(Boolean))].sort(sortMonth);
     const bucketOrder = ['No of Days between 0 to 30','No of Days between 31 to 60','No of Days between 61 to 90','No of Days between 91 to 120','No of Days between 121 to 150','No of Days between 151 to 180','No of Days between 181 to 210'];
     const bucketLabels = ['0-30','31-60','61-90','91-120','121-150','151-180','181-210','211+'];
-    const allBuckets = [...new Set(paData.map(r => r.Description).filter(Boolean))];
+    const allBuckets = [...new Set(paFiltered.map(r => r.Description).filter(Boolean))];
     const overflowBuckets = allBuckets.filter(b => !bucketOrder.includes(b) && b.includes('211'));
-
-    // Latest month summary chart (bar)
-    const latestPaMonth = paMonths.length ? paMonths[paMonths.length-1] : '';
-    const latestPa = paData.filter(r => r.Month === latestPaMonth);
-    const summaryVals = bucketOrder.map(b => { const r = latestPa.find(x => x.Description === b); return r ? num(r['No of Pallets']) : 0; });
-    const overflowVal = overflowBuckets.reduce((s, b) => { const r = latestPa.find(x => x.Description === b); return s + (r ? num(r['No of Pallets']) : 0); }, 0);
-    summaryVals.push(overflowVal);
     const bucketColors = ['#1a9d5c','#27ae60','#f1c40f','#e67e22','#e74c3c','#c0392b','#8e44ad','#2c3e50'];
+
+    // Summary chart: latest month in filtered set (or aggregate if single month selected)
+    const latestPaMonth = paMonths.length ? paMonths[paMonths.length-1] : '';
+    const summaryData = paMonths.length === 1 ? paFiltered : paFiltered.filter(r => r.Month === latestPaMonth);
+    const summaryVals = bucketOrder.map(b => summaryData.filter(x => x.Description === b).reduce((s,r) => s + num(r['No of Pallets']), 0));
+    summaryVals.push(overflowBuckets.reduce((s, b) => s + summaryData.filter(x => x.Description === b).reduce((s2,r) => s2 + num(r['No of Pallets']), 0), 0));
+    const summaryLabel = paMonths.length === 1 ? paMonths[0] : latestPaMonth;
 
     ['chartAgingSummary','chartAgingTrend'].forEach(id => { if (allCharts[id]) { allCharts[id].destroy(); delete allCharts[id]; } });
     makeChart('chartAgingSummary', {
         type: 'bar',
-        data: { labels: bucketLabels, datasets: [{ label: 'Pallets (' + latestPaMonth + ')', data: summaryVals, backgroundColor: bucketColors }] },
+        data: { labels: bucketLabels, datasets: [{ label: 'Pallets (' + summaryLabel + ')', data: summaryVals, backgroundColor: bucketColors }] },
         options: { responsive: true, scales: { y: { ticks: { callback: v => fmt(v) } } }, plugins: { legend: { display: false } } }
     });
 
-    // Aging trend chart (stacked area by bucket across months)
-    const trendMonths = paMonths.slice(-12);
+    // Trend chart: all filtered months
+    const trendMonths = paMonths;
     const trendDatasets = bucketOrder.map((b, i) => ({
-        label: bucketLabels[i], data: trendMonths.map(m => { const r = paData.find(x => x.Month === m && x.Description === b); return r ? num(r['No of Pallets']) : 0; }),
+        label: bucketLabels[i], data: trendMonths.map(m => { const r = paFiltered.find(x => x.Month === m && x.Description === b); return r ? num(r['No of Pallets']) : 0; }),
         backgroundColor: bucketColors[i] + '80', borderColor: bucketColors[i], fill: true, tension: 0.3
     }));
     trendDatasets.push({
-        label: '211+', data: trendMonths.map(m => overflowBuckets.reduce((s, b) => { const r = paData.find(x => x.Month === m && x.Description === b); return s + (r ? num(r['No of Pallets']) : 0); }, 0)),
+        label: '211+', data: trendMonths.map(m => overflowBuckets.reduce((s, b) => { const r = paFiltered.find(x => x.Month === m && x.Description === b); return s + (r ? num(r['No of Pallets']) : 0); }, 0)),
         backgroundColor: bucketColors[7] + '80', borderColor: bucketColors[7], fill: true, tension: 0.3
     });
     makeChart('chartAgingTrend', {
@@ -2198,10 +2199,10 @@ function renderInventory() {
         options: { responsive: true, interaction: { mode: 'index', intersect: false }, scales: { y: { stacked: true, ticks: { callback: v => fmt(v) } }, x: { ticks: { maxRotation: 45 } } } }
     });
 
-    // Aging table (last 6 months)
+    // Aging table: all filtered months
     const agTb = document.querySelector('#tblAging tbody');
-    paMonths.slice(-6).reverse().forEach(m => {
-        const monthRows = paData.filter(r => r.Month === m);
+    paMonths.slice().reverse().forEach(m => {
+        const monthRows = paFiltered.filter(r => r.Month === m);
         bucketOrder.forEach((b, i) => {
             const r = monthRows.find(x => x.Description === b);
             if (r && num(r['No of Pallets']) > 0) {
