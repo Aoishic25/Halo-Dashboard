@@ -396,7 +396,17 @@ tbody td:first-child{font-weight:700;color:var(--teal)}
 
 <div class="section-divider">Expired &amp; Near-Expiry Stock</div>
 <div class="tbl-wrap"><div class="tbl-scroll"><table id="tblExpired">
-<thead><tr><th>SKU</th><th>Description</th><th>MFD</th><th>Expiry</th><th>Pack Size</th><th>Qty</th><th>Month</th></tr></thead>
+<thead><tr><th>SKU</th><th>Description</th><th>MFD</th><th>Expiry</th><th>Pack Size</th><th>Qty</th><th>Shelf Life %</th><th>Aging (Days)</th><th>Month</th></tr></thead>
+<tbody></tbody>
+</table></div></div>
+
+<div class="section-divider">Aging Analysis</div>
+<div class="chart-row">
+<div class="chart-box"><h3>Pallet Aging Summary (Latest Month)</h3><canvas id="chartAgingSummary"></canvas></div>
+<div class="chart-box"><h3>Aging Trend by Bucket</h3><canvas id="chartAgingTrend"></canvas></div>
+</div>
+<div class="tbl-wrap"><div class="tbl-scroll"><table id="tblAging">
+<thead><tr><th>Month</th><th>Aging Bucket</th><th>No of Pallets</th><th>% of Total</th></tr></thead>
 <tbody></tbody>
 </table></div></div>
 </div>
@@ -1966,11 +1976,12 @@ function invFilterArr(arr, hubKey) {
 }
 function reRenderInventory() {
     renderedTabs.delete('inventory');
-    ['chartAging','chartStorageHub','chartStorageBand','chartStockMov'].forEach(id => {
+    ['chartAging','chartStorageHub','chartStorageBand','chartStockMov','chartAgingSummary','chartAgingTrend'].forEach(id => {
         if (allCharts[id]) { allCharts[id].destroy(); delete allCharts[id]; }
     });
-    const tb = document.querySelector('#tblExpired tbody');
-    if (tb) tb.innerHTML = '';
+    ['#tblExpired tbody','#tblAging tbody'].forEach(sel => {
+        const tb = document.querySelector(sel); if (tb) tb.innerHTML = '';
+    });
     renderInventory();
     renderedTabs.add('inventory');
 }
@@ -2121,11 +2132,87 @@ function renderInventory() {
         options:{scales:{y:{ticks:{callback:v=>fmt(v)}}}}
     });
 
-    // Expired Stock Table
+    // Expired Stock Table (with Shelf Life % and Aging)
     const exTb = document.querySelector('#tblExpired tbody');
     const exData = gf(DATA.expiredStock || [], 'Month Name');
-    exData.slice(0,30).forEach(r => {
-        exTb.innerHTML += `<tr><td>${r.No||''}</td><td>${(r.Description||'').substring(0,45)}</td><td>${r['MFD Date']||''}</td><td>${r['Expiry Date']||''}</td><td>${r['Pack Size']||''}</td><td>${r['Sum of Total Quantity']||''}</td><td>${r['Month Name']||''}</td></tr>`;
+    exData.sort((a,b) => {
+        const sa = a['Sum of Remaining Shelf Life (%)'] ? parseFloat(a['Sum of Remaining Shelf Life (%)']) : 999;
+        const sb = b['Sum of Remaining Shelf Life (%)'] ? parseFloat(b['Sum of Remaining Shelf Life (%)']) : 999;
+        return sa - sb;
+    });
+    exData.slice(0,50).forEach(r => {
+        const shelfPct = r['Sum of Remaining Shelf Life (%)'];
+        const shelfStr = shelfPct ? parseFloat(shelfPct).toFixed(1) + '%' : '-';
+        let shelfClass = '';
+        if (shelfPct) { const sv = parseFloat(shelfPct); shelfClass = sv <= 0 ? 'color:#d33;font-weight:600' : sv < 30 ? 'color:#d4930d;font-weight:600' : 'color:#1a9d5c'; }
+        // Aging: days from MFD to now
+        let agingStr = '-';
+        const mfd = r['MFD Date'];
+        if (mfd) {
+            const mfdDate = typeof mfd === 'number' || /^\d+$/.test(mfd) ? new Date((parseInt(mfd) - 25569) * 86400000) : new Date(mfd);
+            if (!isNaN(mfdDate)) { agingStr = Math.floor((Date.now() - mfdDate) / 86400000) + 'd'; }
+        }
+        exTb.innerHTML += `<tr><td>${r.No||''}</td><td>${(r.Description||'').substring(0,45)}</td><td>${r['MFD Date']||''}</td><td>${r['Expiry Date']||''}</td><td>${r['Pack Size']||''}</td><td>${r['Sum of Total Quantity']||''}</td><td style="${shelfClass}">${shelfStr}</td><td>${agingStr}</td><td>${r['Month Name']||''}</td></tr>`;
+    });
+
+    // Aging Analysis
+    const paData = DATA.palletAging || [];
+    const paMonths = [...new Set(paData.map(r => r.Month).filter(Boolean))].sort((a,b) => {
+        const mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        const pa2 = a.split('-'), pb2 = b.split('-');
+        return (parseInt('20'+pa2[1])*100 + mo.indexOf(pa2[0])) - (parseInt('20'+pb2[1])*100 + mo.indexOf(pb2[0]));
+    });
+    const bucketOrder = ['No of Days between 0 to 30','No of Days between 31 to 60','No of Days between 61 to 90','No of Days between 91 to 120','No of Days between 121 to 150','No of Days between 151 to 180','No of Days between 181 to 210'];
+    const bucketLabels = ['0-30','31-60','61-90','91-120','121-150','151-180','181-210','211+'];
+    const allBuckets = [...new Set(paData.map(r => r.Description).filter(Boolean))];
+    const overflowBuckets = allBuckets.filter(b => !bucketOrder.includes(b) && b.includes('211'));
+
+    // Latest month summary chart (bar)
+    const latestPaMonth = paMonths.length ? paMonths[paMonths.length-1] : '';
+    const latestPa = paData.filter(r => r.Month === latestPaMonth);
+    const summaryVals = bucketOrder.map(b => { const r = latestPa.find(x => x.Description === b); return r ? num(r['No of Pallets']) : 0; });
+    const overflowVal = overflowBuckets.reduce((s, b) => { const r = latestPa.find(x => x.Description === b); return s + (r ? num(r['No of Pallets']) : 0); }, 0);
+    summaryVals.push(overflowVal);
+    const bucketColors = ['#1a9d5c','#27ae60','#f1c40f','#e67e22','#e74c3c','#c0392b','#8e44ad','#2c3e50'];
+
+    ['chartAgingSummary','chartAgingTrend'].forEach(id => { if (allCharts[id]) { allCharts[id].destroy(); delete allCharts[id]; } });
+    makeChart('chartAgingSummary', {
+        type: 'bar',
+        data: { labels: bucketLabels, datasets: [{ label: 'Pallets (' + latestPaMonth + ')', data: summaryVals, backgroundColor: bucketColors }] },
+        options: { responsive: true, scales: { y: { ticks: { callback: v => fmt(v) } } }, plugins: { legend: { display: false } } }
+    });
+
+    // Aging trend chart (stacked area by bucket across months)
+    const trendMonths = paMonths.slice(-12);
+    const trendDatasets = bucketOrder.map((b, i) => ({
+        label: bucketLabels[i], data: trendMonths.map(m => { const r = paData.find(x => x.Month === m && x.Description === b); return r ? num(r['No of Pallets']) : 0; }),
+        backgroundColor: bucketColors[i] + '80', borderColor: bucketColors[i], fill: true, tension: 0.3
+    }));
+    trendDatasets.push({
+        label: '211+', data: trendMonths.map(m => overflowBuckets.reduce((s, b) => { const r = paData.find(x => x.Month === m && x.Description === b); return s + (r ? num(r['No of Pallets']) : 0); }, 0)),
+        backgroundColor: bucketColors[7] + '80', borderColor: bucketColors[7], fill: true, tension: 0.3
+    });
+    makeChart('chartAgingTrend', {
+        type: 'line',
+        data: { labels: trendMonths, datasets: trendDatasets },
+        options: { responsive: true, interaction: { mode: 'index', intersect: false }, scales: { y: { stacked: true, ticks: { callback: v => fmt(v) } }, x: { ticks: { maxRotation: 45 } } } }
+    });
+
+    // Aging table (last 6 months)
+    const agTb = document.querySelector('#tblAging tbody');
+    paMonths.slice(-6).reverse().forEach(m => {
+        const monthRows = paData.filter(r => r.Month === m);
+        bucketOrder.forEach((b, i) => {
+            const r = monthRows.find(x => x.Description === b);
+            if (r && num(r['No of Pallets']) > 0) {
+                agTb.innerHTML += `<tr><td>${m}</td><td>${bucketLabels[i]} days</td><td>${fmt(num(r['No of Pallets']))}</td><td>${(parseFloat(r['%']||0)*100).toFixed(1)}%</td></tr>`;
+            }
+        });
+        const ovr = overflowBuckets.reduce((s, b2) => { const r = monthRows.find(x => x.Description === b2); return s + (r ? num(r['No of Pallets']) : 0); }, 0);
+        if (ovr > 0) {
+            const ovrPct = overflowBuckets.reduce((s, b2) => { const r = monthRows.find(x => x.Description === b2); return s + (r ? parseFloat(r['%']||0) : 0); }, 0);
+            agTb.innerHTML += `<tr><td>${m}</td><td>211+ days</td><td>${fmt(ovr)}</td><td>${(ovrPct*100).toFixed(1)}%</td></tr>`;
+        }
     });
 }
 
