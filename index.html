@@ -258,6 +258,7 @@ tbody td:first-child{font-weight:700;color:var(--teal)}
 <div class="page-sub">Management Review Dashboard</div>
 <div class="filter-bar" style="margin:12px 0 0">
 <label>REGION</label><select id="kpiRegion" onchange="renderKPI()"><option value="all">All Regions</option></select>
+<button onclick="document.getElementById('kpiRegion').value='all';renderKPI()" style="background:var(--forest);color:#fff;border:none;padding:6px 14px;border-radius:4px;cursor:pointer;font:600 13px Calibri,sans-serif;margin-left:8px">&#x21BA; Reset</button>
 </div>
 
 <div style="margin:16px 0 8px">
@@ -297,6 +298,7 @@ tbody td:first-child{font-weight:700;color:var(--teal)}
 <div class="page-sub">Current Month Summary &mdash; METAP Warehousing Operations</div>
 <div class="filter-bar" style="margin:12px 0 0">
 <label>REGION</label><select id="execRegion" onchange="renderExecutive()"><option value="all">All Regions</option></select>
+<button onclick="document.getElementById('execRegion').value='all';renderExecutive()" style="background:var(--forest);color:#fff;border:none;padding:6px 14px;border-radius:4px;cursor:pointer;font:600 13px Calibri,sans-serif;margin-left:8px">&#x21BA; Reset</button>
 </div>
 
 <div class="callout">
