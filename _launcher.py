@@ -130,17 +130,33 @@ def run_extraction():
     extract_status['running'] = True
     extract_status['last_error'] = None
     try:
-        result = subprocess.run(
-            ['powershell', '-ExecutionPolicy', 'Bypass', '-File', EXTRACT_SCRIPT],
-            capture_output=True, text=True, timeout=600, cwd=ROOT
-        )
-        if result.returncode == 0:
-            extract_status['last_run'] = time.time()
-            extract_status['last_mtime'] = os.path.getmtime(DATA_BLOCK) if os.path.exists(DATA_BLOCK) else 0
-            return True, result.stdout
+        if os.path.exists(EXTRACT_SCRIPT):
+            result = subprocess.run(
+                ['powershell', '-ExecutionPolicy', 'Bypass', '-File', EXTRACT_SCRIPT],
+                capture_output=True, text=True, timeout=600, cwd=ROOT
+            )
+            if result.returncode == 0:
+                extract_status['last_run'] = time.time()
+                extract_status['last_mtime'] = os.path.getmtime(DATA_BLOCK) if os.path.exists(DATA_BLOCK) else 0
+                build_data_context()
+                return True, result.stdout
+            else:
+                extract_status['last_error'] = result.stderr or result.stdout
+                return False, result.stderr or result.stdout
         else:
-            extract_status['last_error'] = result.stderr or result.stdout
-            return False, result.stderr or result.stdout
+            try:
+                from _extract_openpyxl import run_extraction as openpyxl_extract
+            except ImportError:
+                sys.path.insert(0, ROOT)
+                from _extract_openpyxl import run_extraction as openpyxl_extract
+            ok, msg = openpyxl_extract(EXCEL_PATH, DATA_BLOCK)
+            if ok:
+                extract_status['last_run'] = time.time()
+                extract_status['last_mtime'] = os.path.getmtime(DATA_BLOCK) if os.path.exists(DATA_BLOCK) else 0
+                build_data_context()
+            else:
+                extract_status['last_error'] = msg
+            return ok, msg
     except Exception as e:
         extract_status['last_error'] = str(e)
         return False, str(e)
@@ -256,6 +272,9 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
                 pass
             self.send_json({'hasKey': has_key, 'ollamaRunning': ollama_ok, 'dataLoaded': bool(_data_context)})
         else:
+            if self.path == '/.groq_key':
+                self.send_error(403, 'Forbidden')
+                return
             super().do_GET()
 
     def do_POST(self):
@@ -263,8 +282,57 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_chat()
         elif self.path == '/api/set-key':
             self.handle_set_key()
+        elif self.path == '/api/upload':
+            self.handle_upload()
         else:
             self.send_error(404)
+
+    def handle_upload(self):
+        try:
+            content_length = int(self.headers.get('Content-Length', 0))
+            if content_length > 50 * 1024 * 1024:
+                self.send_json({'error': 'File too large (max 50MB)'}, 413)
+                return
+            content_type = self.headers.get('Content-Type', '')
+            if 'multipart/form-data' not in content_type:
+                self.send_json({'error': 'Expected multipart/form-data'}, 400)
+                return
+            boundary = re.search(r'boundary=(.+)', content_type)
+            if not boundary:
+                self.send_json({'error': 'No boundary in content-type'}, 400)
+                return
+            body = self.rfile.read(content_length)
+            parts = body.split(b'--' + boundary.group(1).encode())
+            filename, file_data = None, None
+            for part in parts:
+                if b'filename=' not in part:
+                    continue
+                header_end = part.find(b'\r\n\r\n')
+                if header_end == -1:
+                    continue
+                headers = part[:header_end].decode('utf-8', errors='replace')
+                file_data = part[header_end + 4:]
+                if file_data.endswith(b'\r\n'):
+                    file_data = file_data[:-2]
+                fn_match = re.search(r'filename="([^"]+)"', headers)
+                filename = fn_match.group(1) if fn_match else 'upload.xlsx'
+                break
+            if not file_data:
+                self.send_json({'error': 'No file found in upload'}, 400)
+                return
+            if not filename.endswith('.xlsx'):
+                self.send_json({'error': 'Only .xlsx files are accepted'}, 400)
+                return
+            excel_dir = os.path.dirname(EXCEL_PATH)
+            os.makedirs(excel_dir, exist_ok=True)
+            with open(EXCEL_PATH, 'wb') as f:
+                f.write(file_data)
+            size_kb = len(file_data) // 1024
+            print(f'Upload received: {filename} ({size_kb} KB)')
+            run_extraction_bg()
+            self.send_json({'ok': True, 'filename': filename, 'size': size_kb, 'message': 'File uploaded. Extraction started.'})
+        except Exception as e:
+            self.send_json({'error': str(e)}, 500)
 
     def handle_set_key(self):
         try:

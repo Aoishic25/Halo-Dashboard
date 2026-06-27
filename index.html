@@ -282,7 +282,7 @@ tbody td:first-child{font-weight:700;color:var(--teal)}
 </div>
 
 <div class="chart-row">
-<div class="chart-box"><h3>Monthly Warehousing KPI Trend</h3><canvas id="chartKpiWhTrend"></canvas></div>
+<div class="chart-box"><h3>Monthly Cost Trend</h3><canvas id="chartKpiWhTrend"></canvas></div>
 <div class="chart-box"><h3>Cost Breakdown (Latest Month)</h3><canvas id="chartKpiCostBreak"></canvas></div>
 </div>
 <div class="chart-row">
@@ -1337,6 +1337,8 @@ function applyGlobalFilter() {
     renderedTabs.clear();
     Object.values(allCharts).forEach(c => { try{c.destroy()}catch(e){} });
     allCharts = {};
+    Object.values(kpiCharts).forEach(c => { try{c.destroy()}catch(e){} });
+    Object.keys(kpiCharts).forEach(k => delete kpiCharts[k]);
     document.querySelectorAll('tbody').forEach(tb => tb.innerHTML = '');
     renderExecutive();
     renderedTabs.add('executive');
@@ -1526,24 +1528,30 @@ function renderKPI() {
     document.getElementById('kpiTrBody').innerHTML = trRows.join('');
 
     // -- Charts --
-    const sfMonths = sf.map(r => r.Month);
+    // Cost trend by month (responds to region filter)
+    const costLabels = cdMonths.map(c => c.m);
+    const costData = cdMonths.map(c => c.cost);
+    const cpcData = cdMonths.map(c => c.cases ? c.cost/c.cases : 0);
     if (kpiCharts.whTrend) kpiCharts.whTrend.destroy();
     kpiCharts.whTrend = new Chart(document.getElementById('chartKpiWhTrend'), {
-        type:'line', data:{labels: sfMonths, datasets:[
-            {label:'Inbound', data:sf.map(r=>num(r.Inbound)), borderColor:'#1abc9c', backgroundColor:'rgba(26,188,156,0.1)', fill:true, tension:0.3},
-            {label:'Outbound', data:sf.map(r=>num(r.Outbound)), borderColor:'#e74c3c', backgroundColor:'rgba(231,76,60,0.1)', fill:true, tension:0.3},
-            {label:'Closing Stock', data:sf.map(r=>num(r['Closing Stock'])), borderColor:'#3498db', borderDash:[5,5], fill:false, tension:0.3, yAxisID:'y1'}
+        type:'line', data:{labels: costLabels, datasets:[
+            {label:'Total Cost (AED)', data:costData, borderColor:'#1abc9c', backgroundColor:'rgba(26,188,156,0.1)', fill:true, tension:0.3, yAxisID:'y'},
+            {label:'Cost per Case (AED)', data:cpcData, borderColor:'#e74c3c', borderDash:[5,5], fill:false, tension:0.3, yAxisID:'y1'}
         ]},
         options:{responsive:true, interaction:{mode:'index',intersect:false}, scales:{
-            y:{title:{display:true,text:'Cases'},ticks:{callback:v=>fmt(v)}},
-            y1:{position:'right',title:{display:true,text:'Stock'},grid:{drawOnChartArea:false},ticks:{callback:v=>fmt(v)}}
+            y:{title:{display:true,text:'Total Cost (AED)'},ticks:{callback:v=>fmt(v)}},
+            y1:{position:'right',title:{display:true,text:'Cost/Case'},grid:{drawOnChartArea:false}}
         }}
     });
 
-    const hIn = num(latestCC['Handling IN']), hOut = num(latestCC['Handling Out']), pp = num(latestCC['Pick & Pack']), stor = num(latestCC['Pallets Storage']);
+    // Cost breakdown from region-filtered costingDet (responds to region)
+    const latestCdMonth = cdMonths.length ? cdMonths[cdMonths.length-1].m : null;
+    const latestCdRows = latestCdMonth ? cdAll.filter(r => r['Month-Year'] === latestCdMonth) : [];
+    let hIn=0, hOut=0, pp=0, stor=0;
+    latestCdRows.forEach(r => { hIn+=num(r['Handling IN']); hOut+=num(r['Handling Out']); pp+=num(r['Pick & Pack']); stor+=num(r['Storage']); });
     if (kpiCharts.costBreak) kpiCharts.costBreak.destroy();
     kpiCharts.costBreak = new Chart(document.getElementById('chartKpiCostBreak'), {
-        type:'doughnut', data:{labels:['Handling IN','Handling Out','Pick & Pack','Pallet Storage'],
+        type:'doughnut', data:{labels:['Handling IN','Handling Out','Pick & Pack','Storage'],
         datasets:[{data:[hIn,hOut,pp,stor], backgroundColor:['#1abc9c','#e74c3c','#3498db','#f39c12']}]},
         options:{responsive:true, plugins:{legend:{position:'bottom'}}}
     });
