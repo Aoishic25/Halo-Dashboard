@@ -1533,14 +1533,15 @@ function renderKPI() {
     const costData = cdMonths.map(c => c.cost);
     const cpcData = cdMonths.map(c => c.cases ? c.cost/c.cases : 0);
     if (kpiCharts.whTrend) kpiCharts.whTrend.destroy();
+    const trendType = costLabels.length <= 2 ? 'bar' : 'line';
     kpiCharts.whTrend = new Chart(document.getElementById('chartKpiWhTrend'), {
-        type:'line', data:{labels: costLabels, datasets:[
-            {label:'Total Cost (AED)', data:costData, borderColor:'#1abc9c', backgroundColor:'rgba(26,188,156,0.1)', fill:true, tension:0.3, yAxisID:'y'},
-            {label:'Cost per Case (AED)', data:cpcData, borderColor:'#e74c3c', borderDash:[5,5], fill:false, tension:0.3, yAxisID:'y1'}
+        type: trendType, data:{labels: costLabels, datasets:[
+            {label:'Total Cost (AED)', data:costData, borderColor:'#1abc9c', backgroundColor:'rgba(26,188,156,0.3)', fill: trendType==='line', tension:0.3, yAxisID:'y'},
+            {label:'Cost per Case (AED)', data:cpcData, borderColor:'#e74c3c', backgroundColor:'rgba(231,76,60,0.3)', borderDash: trendType==='line'?[5,5]:[], fill:false, tension:0.3, yAxisID:'y1'}
         ]},
         options:{responsive:true, interaction:{mode:'index',intersect:false}, scales:{
-            y:{title:{display:true,text:'Total Cost (AED)'},ticks:{callback:v=>fmt(v)}},
-            y1:{position:'right',title:{display:true,text:'Cost/Case'},grid:{drawOnChartArea:false}}
+            y:{beginAtZero:true, title:{display:true,text:'Total Cost (AED)'},ticks:{callback:v=>fmt(v)}},
+            y1:{beginAtZero:true, position:'right',title:{display:true,text:'Cost/Case'},grid:{drawOnChartArea:false}}
         }}
     });
 
