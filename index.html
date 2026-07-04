@@ -173,6 +173,13 @@ tbody td:first-child{font-weight:700;color:var(--teal)}
 </div>
 </div>
 
+<!-- EXTRACTION PROGRESS PANEL -->
+<div id="extractProgress" style="display:none;position:fixed;top:60px;right:20px;z-index:9000;background:#1e293b;border:1px solid var(--orange);border-radius:8px;padding:14px 18px;min-width:280px;box-shadow:0 4px 20px rgba(0,0,0,.4);font-family:Calibri,sans-serif">
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span style="color:var(--orange);font-weight:700;font-size:13px">&#x2699; Extracting Data</span><span id="extractStepLabel" style="color:#94a3b8;font-size:11px;margin-left:auto">0/0</span></div>
+<div style="background:#334155;border-radius:4px;height:8px;overflow:hidden;margin-bottom:6px"><div id="extractBar" style="height:100%;background:var(--orange);border-radius:4px;transition:width .3s;width:0%"></div></div>
+<div id="extractMsg" style="color:#cbd5e1;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Starting...</div>
+</div>
+
 <!-- ASK HALO CHAT PANEL -->
 <div class="halo-chat-overlay" id="haloChatOverlay" onclick="if(event.target===this)toggleHaloChat()">
 <div class="halo-chat-panel">
@@ -3443,12 +3450,32 @@ async function uploadExcel(input) {
 }
 
 function pollExtraction() {
+    const panel = document.getElementById('extractProgress');
+    const bar = document.getElementById('extractBar');
+    const msg = document.getElementById('extractMsg');
+    const stepLabel = document.getElementById('extractStepLabel');
+    panel.style.display = 'block';
+
     const poll = setInterval(async () => {
         try {
-            const res = await fetch('/api/data-mtime');
-            const d = await res.json();
+            const [mRes, pRes] = await Promise.all([
+                fetch('/api/data-mtime'),
+                fetch('/api/extract-progress')
+            ]);
+            const d = await mRes.json();
+            const p = await pRes.json();
+            if (p.total > 0) {
+                const pct = Math.round((p.step / p.total) * 100);
+                bar.style.width = pct + '%';
+                stepLabel.textContent = p.step + '/' + p.total;
+            }
+            if (p.progress) msg.textContent = p.progress;
+
             if (!d.extracting) {
                 clearInterval(poll);
+                bar.style.width = '100%';
+                msg.textContent = 'Done!';
+                setTimeout(() => { panel.style.display = 'none'; }, 1500);
                 if (d.mtime > _lastDataMtime) {
                     showToast('Extraction complete — reloading...', 'var(--green)', 2000);
                     setTimeout(() => window.location.reload(), 1500);
@@ -3462,7 +3489,7 @@ function pollExtraction() {
                 }
             }
         } catch(e) {}
-    }, 3000);
+    }, 1000);
 }
 
 async function toggleAutoSync(on) {

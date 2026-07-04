@@ -20,7 +20,7 @@ DATA_BLOCK = os.path.join(ROOT, '_data_block.js')
 CLOUDFLARED = os.path.join(ROOT, 'cloudflared.exe')
 MAX_UPLOAD_SIZE = 50 * 1024 * 1024
 
-extract_status = {'running': False, 'last_run': 0, 'last_error': None, 'last_mtime': 0}
+extract_status = {'running': False, 'last_run': 0, 'last_error': None, 'last_mtime': 0, 'progress': '', 'step': 0, 'total': 0}
 OLLAMA_URL = 'http://localhost:11434/api/chat'
 OLLAMA_MODEL = 'llama3.2:3b'
 GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
@@ -126,10 +126,19 @@ def run_extraction():
         return False, 'Extraction already running'
     extract_status['running'] = True
     extract_status['last_error'] = None
+    extract_status['progress'] = 'Starting...'
+    extract_status['step'] = 0
+    extract_status['total'] = 0
+
+    def _on_progress(msg, step, total):
+        extract_status['progress'] = msg
+        extract_status['step'] = step
+        extract_status['total'] = total
+
     try:
         if IS_CLOUD or not os.path.exists(EXTRACT_SCRIPT) or sys.platform != 'win32':
             from _extract_openpyxl import run_extraction as openpyxl_extract
-            ok, msg = openpyxl_extract(EXCEL_PATH, DATA_BLOCK)
+            ok, msg = openpyxl_extract(EXCEL_PATH, DATA_BLOCK, on_progress=_on_progress)
             if ok:
                 extract_status['last_run'] = time.time()
                 extract_status['last_mtime'] = os.path.getmtime(DATA_BLOCK) if os.path.exists(DATA_BLOCK) else 0
@@ -275,6 +284,13 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
         elif self.path == '/api/data-mtime':
             mtime = os.path.getmtime(DATA_BLOCK) if os.path.exists(DATA_BLOCK) else 0
             self.send_json({'mtime': mtime, 'extracting': extract_status['running']})
+        elif self.path == '/api/extract-progress':
+            self.send_json({
+                'running': extract_status['running'],
+                'progress': extract_status['progress'],
+                'step': extract_status['step'],
+                'total': extract_status['total']
+            })
         elif self.path == '/api/tunnel-url':
             self.send_json({'url': tunnel_url})
         elif self.path == '/api/agent-status':

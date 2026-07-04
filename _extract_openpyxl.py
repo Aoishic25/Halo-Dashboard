@@ -110,13 +110,15 @@ SHEET_MAP = {
 }
 
 
-def run_extraction(excel_path=None, output_path=None):
+def run_extraction(excel_path=None, output_path=None, on_progress=None):
     excel_path = excel_path or EXCEL_PATH
     output_path = output_path or OUTPUT_PATH
 
     if not os.path.exists(excel_path):
         return False, f'Excel file not found: {excel_path}'
 
+    if on_progress:
+        on_progress('Opening Excel file...', 0, len(SHEET_MAP))
     print(f'Opening {os.path.basename(excel_path)}...')
     wb = load_workbook(excel_path, read_only=True, data_only=True)
 
@@ -124,10 +126,14 @@ def run_extraction(excel_path=None, output_path=None):
     total = len(SHEET_MAP)
     for i, (key, params) in enumerate(SHEET_MAP.items(), 1):
         sheet_name, max_rows, header_row, start_col, end_col = params
+        if on_progress:
+            on_progress(f'[{i}/{total}] {key}', i, total)
         print(f'  [{i}/{total}] Extracting: {key} ({sheet_name})...')
         rows = extract_sheet(wb, sheet_name, max_rows, header_row, start_col, end_col)
         all_data[key] = rows
 
+    if on_progress:
+        on_progress('Writing data file...', total, total)
     wb.close()
 
     result = 'var EMBEDDED_DATA=' + json.dumps(all_data, ensure_ascii=False, separators=(',', ':')) + ';'
