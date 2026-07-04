@@ -136,29 +136,15 @@ def run_extraction():
         extract_status['total'] = total
 
     try:
-        if IS_CLOUD or not os.path.exists(EXTRACT_SCRIPT) or sys.platform != 'win32':
-            from _extract_openpyxl import run_extraction as openpyxl_extract
-            ok, msg = openpyxl_extract(EXCEL_PATH, DATA_BLOCK, on_progress=_on_progress)
-            if ok:
-                extract_status['last_run'] = time.time()
-                extract_status['last_mtime'] = os.path.getmtime(DATA_BLOCK) if os.path.exists(DATA_BLOCK) else 0
-                build_data_context()
-            else:
-                extract_status['last_error'] = msg
-            return ok, msg
+        from _extract_openpyxl import run_extraction as openpyxl_extract
+        ok, msg = openpyxl_extract(EXCEL_PATH, DATA_BLOCK, on_progress=_on_progress)
+        if ok:
+            extract_status['last_run'] = time.time()
+            extract_status['last_mtime'] = os.path.getmtime(DATA_BLOCK) if os.path.exists(DATA_BLOCK) else 0
+            build_data_context()
         else:
-            result = subprocess.run(
-                ['powershell', '-ExecutionPolicy', 'Bypass', '-File', EXTRACT_SCRIPT],
-                capture_output=True, text=True, timeout=600, cwd=ROOT
-            )
-            if result.returncode == 0:
-                extract_status['last_run'] = time.time()
-                extract_status['last_mtime'] = os.path.getmtime(DATA_BLOCK) if os.path.exists(DATA_BLOCK) else 0
-                build_data_context()
-                return True, result.stdout
-            else:
-                extract_status['last_error'] = result.stderr or result.stdout
-                return False, result.stderr or result.stdout
+            extract_status['last_error'] = msg
+        return ok, msg
     except Exception as e:
         extract_status['last_error'] = str(e)
         return False, str(e)
