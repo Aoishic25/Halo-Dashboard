@@ -167,7 +167,7 @@ tbody td:first-child{font-weight:700;color:var(--teal)}
 <span id="fileStatus" style="font:11px Calibri;color:#fff;opacity:.7;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title=""></span>
 <button class="upload-btn" id="editExcelBtn" onclick="openExcel()" title="Open Excel file for editing" style="background:var(--green)">&#x270E; Edit in Excel</button>
 <button class="upload-btn" id="syncBtn" onclick="syncData()" title="Extract & reload data from Excel">&#x21BB; Sync</button>
-<label id="watchLabel" style="font:11px Calibri;color:#fff;cursor:pointer;display:flex;align-items:center;gap:4px" title="Auto-sync when Excel file is saved"><input type="checkbox" id="autoWatch" onchange="toggleAutoSync(this.checked)" style="accent-color:var(--green)"> Auto</label>
+<label id="watchLabel" style="font:11px Calibri;color:#fff;cursor:pointer;display:flex;align-items:center;gap:4px" title="Auto-sync when Excel file is saved"><input type="checkbox" id="autoWatch" style="accent-color:var(--green)"> Auto</label>
 </div>
 <button class="ask-halo-btn" onclick="toggleHaloChat()" title="Ask Halo AI about your data"><svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.2L4 17.2V4h16v12z"/><path d="M7 9h2v2H7zm4 0h2v2h11zm4 0h2v2h-2z"/></svg> Ask Halo</button>
 </div>
@@ -3465,21 +3465,26 @@ function pollExtraction() {
 }
 
 async function toggleAutoSync(on) {
-    if (on) {
-        try {
+    const cb = document.getElementById('autoWatch');
+    try {
+        if (on) {
             await fetch('/api/watch-start');
             showToast('Auto-sync enabled — saves in Excel will auto-update', 'var(--green)', 3000);
             startPolling();
-        } catch(e) {
-            showToast('Server not reachable', 'var(--rust)', 4000);
-            document.getElementById('autoWatch').checked = false;
+        } else {
+            try { await fetch('/api/watch-stop'); } catch(e) {}
+            stopPolling();
+            showToast('Auto-sync disabled', 'var(--forest)', 2000);
         }
-    } else {
-        try { await fetch('/api/watch-stop'); } catch(e) {}
-        stopPolling();
-        showToast('Auto-sync disabled', 'var(--forest)', 2000);
+    } catch(e) {
+        showToast('Server not reachable', 'var(--rust)', 4000);
+        cb.checked = false;
     }
 }
+document.addEventListener('DOMContentLoaded', function() {
+    const cb = document.getElementById('autoWatch');
+    if (cb) cb.addEventListener('change', function() { toggleAutoSync(this.checked); });
+});
 
 function startPolling() {
     if (_autoSyncTimer) return;
