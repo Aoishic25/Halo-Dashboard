@@ -1300,6 +1300,22 @@ function populateFilters() {
 
     const wy = document.getElementById('whYear');
     if (wy) { wy.innerHTML = '<option value="all">All</option>'; years.forEach(y => { const o = document.createElement('option'); o.value = y; o.text = y; wy.appendChild(o); }); }
+
+    // Auto-select latest month from data
+    const MI = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+    let latestScore = -1, latestMon = null, latestYr = null;
+    allDates.forEach(d => {
+        const p = d.match(/^([A-Za-z]{3})-(\d{2})$/);
+        if (!p) return;
+        const mn = p[1].charAt(0).toUpperCase() + p[1].slice(1).toLowerCase();
+        const yr = 2000 + parseInt(p[2]);
+        const score = yr * 12 + (MI[mn] || 0);
+        if (score > latestScore) { latestScore = score; latestMon = mn; latestYr = yr; }
+    });
+    if (latestMon && latestYr) {
+        gm.value = latestMon;
+        gy.value = String(latestYr);
+    }
 }
 
 // Global filter: returns a filter function that checks Mon-YY date fields
