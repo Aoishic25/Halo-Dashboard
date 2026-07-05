@@ -189,12 +189,7 @@ tbody td:first-child{font-weight:700;color:var(--teal)}
 <button class="halo-chat-close" onclick="toggleHaloChat()">&times;</button>
 </div>
 <div class="halo-chat-body" id="haloChatBody">
-<div class="halo-msg bot">Hi! I'm <strong>Halo</strong>, your dashboard assistant. Ask me anything about your supply chain data — KPIs, trends, comparisons, or specific numbers.</div>
-<div id="haloSetup" style="background:#FFF3E0;border:1px solid var(--orange);border-radius:8px;padding:12px;margin:8px 0;font-size:12px;line-height:1.6;display:none">
-<strong>One-time setup:</strong> Get a free API key from <a href="https://console.groq.com/keys" target="_blank" style="color:var(--teal);font-weight:600">console.groq.com/keys</a> (Google login).<br>
-<input type="password" id="haloKeyInput" placeholder="Paste key here (starts with gsk_)" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;font:12px Calibri;margin-top:6px">
-<button onclick="saveHaloKey()" style="background:var(--teal);color:#fff;border:none;padding:6px 14px;border-radius:4px;cursor:pointer;font:600 12px Calibri;margin-top:6px;width:100%">Save Key</button>
-</div>
+<div class="halo-msg bot">Hi! I'm <strong>Halo</strong>, your data agent. I work entirely offline — no API keys needed. Ask me about costs, stock, inbound/outbound, damages, orders, storage, trucks, or any KPI.</div>
 </div>
 <div class="halo-chat-input">
 <input type="text" id="haloChatInput" placeholder="Ask about your data..." onkeydown="if(event.key==='Enter')sendHaloMsg()">
@@ -3570,39 +3565,12 @@ async function checkServerStatus() {
 
 checkServerStatus();
 
-// ==================== ASK HALO AGENT ====================
-let _haloReady = false;
-
-async function toggleHaloChat() {
+// ==================== HALO AGENT (client-side, no LLM) ====================
+function toggleHaloChat() {
     const ov = document.getElementById('haloChatOverlay');
     ov.classList.toggle('show');
-    if (ov.classList.contains('show')) {
+    if (ov.classList.contains('show'))
         setTimeout(() => document.getElementById('haloChatInput').focus(), 300);
-        if (!_haloReady) {
-            try {
-                const res = await fetch('/api/agent-status');
-                const st = await res.json();
-                document.getElementById('haloSetup').style.display = st.hasKey ? 'none' : 'block';
-                _haloReady = st.hasKey;
-            } catch(e) {}
-        }
-    }
-}
-
-async function saveHaloKey() {
-    const key = document.getElementById('haloKeyInput').value.trim();
-    if (!key) return;
-    try {
-        const res = await fetch('/api/set-key', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({key})});
-        const d = await res.json();
-        if (d.ok) {
-            document.getElementById('haloSetup').style.display = 'none';
-            _haloReady = true;
-            showToast('API key saved!', 'var(--green)', 2000);
-        } else {
-            showToast(d.error || 'Failed to save key', 'var(--rust)', 3000);
-        }
-    } catch(e) { showToast('Server error', 'var(--rust)', 2000); }
 }
 
 function addHaloMsg(text, type) {
@@ -3610,7 +3578,7 @@ function addHaloMsg(text, type) {
     const div = document.createElement('div');
     div.className = 'halo-msg ' + type;
     if (type === 'bot') {
-        div.innerHTML = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>').replace(/```([\s\S]*?)```/g, '<pre>$1</pre>');
+        div.innerHTML = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
     } else {
         div.textContent = text;
     }
@@ -3618,61 +3586,234 @@ function addHaloMsg(text, type) {
     body.scrollTop = body.scrollHeight;
 }
 
-let _haloHistory = [];
+const _haloAgent = {
+    _n: v => { const n = parseFloat(String(v).replace(/,/g, '')); return isNaN(n) ? 0 : n; },
+    _fmt: v => { if (Math.abs(v) >= 1e6) return (v/1e6).toFixed(1)+'M'; if (Math.abs(v) >= 1e3) return (v/1e3).toFixed(1)+'K'; return v % 1 === 0 ? v.toLocaleString() : v.toFixed(2); },
+    _months: rows => {
+        const mCols = ['Month-Year','Month','month','Month-year'];
+        for (const c of mCols) { if (rows[0] && rows[0][c] !== undefined) return c; }
+        return null;
+    },
+    _latest: (rows, mCol) => {
+        if (!mCol || !rows.length) return rows;
+        const months = [...new Set(rows.map(r => r[mCol]).filter(Boolean))];
+        const last = months[months.length - 1];
+        return rows.filter(r => r[mCol] === last);
+    },
+    _agg: (rows, col) => {
+        const vals = rows.map(r => _haloAgent._n(r[col])).filter(v => v !== 0);
+        if (!vals.length) return null;
+        const sum = vals.reduce((a,b) => a+b, 0);
+        return { sum, avg: sum/vals.length, min: Math.min(...vals), max: Math.max(...vals), count: vals.length };
+    },
+    _topN: (rows, col, n=5, asc=false) => {
+        const scored = rows.filter(r => _haloAgent._n(r[col]) !== 0)
+            .map(r => ({row: r, val: _haloAgent._n(r[col])}))
+            .sort((a,b) => asc ? a.val - b.val : b.val - a.val);
+        return scored.slice(0, n);
+    },
+    _trend: (rows, mCol, valCol) => {
+        const byMonth = {};
+        rows.forEach(r => {
+            const m = r[mCol]; if (!m) return;
+            byMonth[m] = (byMonth[m] || 0) + _haloAgent._n(r[valCol]);
+        });
+        const entries = Object.entries(byMonth);
+        if (entries.length < 2) return null;
+        const last = entries[entries.length-1][1], prev = entries[entries.length-2][1];
+        const pct = prev !== 0 ? ((last - prev) / Math.abs(prev) * 100) : 0;
+        return { labels: entries.map(e=>e[0]), values: entries.map(e=>e[1]), last, prev, change: pct,
+            lastMonth: entries[entries.length-1][0], prevMonth: entries[entries.length-2][0] };
+    },
 
-async function sendHaloMsg() {
+    _datasetMap: {
+        cost: ['costingDet','costingCases'], freight: ['freights'], stock: ['stockFlow'],
+        inbound: ['stockFlow','inboundFlow','inboundSummary','hubInbound','inboundDetail','inbGrnMonthly'],
+        outbound: ['stockFlow','outboundCases','hubOutbound'], quality: ['qualityIssues'],
+        damage: ['damages','whDamages'], complaint: ['customerComplaints'],
+        copacking: ['coPacking','copackingOrders','copackingWeekly'], 'co-packing': ['coPacking','copackingOrders','copackingWeekly'],
+        order: ['weeklyOrders','manualOrders','copackingOrders'], pallet: ['palletAging'],
+        aging: ['palletAging'], waiting: ['waitingCharges'], invoice: ['invoiceSummary'],
+        temp: ['tempReport'], temperature: ['tempReport'], storage: ['storage','storageHub'],
+        expired: ['expiredStock'], expiry: ['expiredStock'], truck: ['truckTurnover'],
+        turnaround: ['truckTurnover'], turnover: ['truckTurnover'],
+        subject: ['subjects'], action: ['subjects'], vendor: ['hubInbound','qualityIssues','inboundIssues'],
+        issue: ['qualityIssues','inboundIssues'], hub: ['hubInbound','hubOutbound','storageHub'],
+        grn: ['inbGrnMonthly'], plan: ['inbGrnMonthly'], sku: ['fzeSkuGw'], ytd: ['ytdTrends']
+    },
+
+    _detectDatasets: q => {
+        const matched = new Set();
+        for (const [kw, ds] of Object.entries(_haloAgent._datasetMap)) {
+            if (q.includes(kw)) ds.forEach(d => matched.add(d));
+        }
+        return matched.size ? [...matched] : null;
+    },
+
+    _detectIntent: q => {
+        if (/\b(trend|trending|over time|month.?over|growth|change|increase|decrease|compare month|monthly)\b/i.test(q)) return 'trend';
+        if (/\b(top|highest|biggest|most|worst|best|largest|maximum)\b/i.test(q)) return 'top';
+        if (/\b(bottom|lowest|least|smallest|minimum|fewest)\b/i.test(q)) return 'bottom';
+        if (/\b(total|sum|how much|how many|count|number of)\b/i.test(q)) return 'total';
+        if (/\b(average|avg|mean|per)\b/i.test(q)) return 'average';
+        if (/\b(latest|recent|current|last|this month|newest)\b/i.test(q)) return 'latest';
+        if (/\b(list|show|all|detail|breakdown|what)\b/i.test(q)) return 'list';
+        if (/\b(help|can you|what can|how to)\b/i.test(q)) return 'help';
+        return 'summary';
+    },
+
+    _detectValueCol: (rows, q) => {
+        if (!rows.length) return null;
+        const cols = Object.keys(rows[0]);
+        const qw = q.toLowerCase().split(/\s+/);
+        for (const w of qw) {
+            const match = cols.find(c => c.toLowerCase().includes(w) && typeof _haloAgent._n(rows[0][c]) === 'number');
+            if (match) return match;
+        }
+        const numCols = cols.filter(c => {
+            const sample = rows.slice(0, 5).map(r => _haloAgent._n(r[c]));
+            return sample.some(v => v !== 0);
+        });
+        return numCols.length ? numCols[numCols.length - 1] : cols[cols.length - 1];
+    },
+
+    _detectGroupCol: (rows, q) => {
+        if (!rows.length) return null;
+        const cols = Object.keys(rows[0]);
+        const prefs = ['Hub','Region','Site','Entity','Vendor','Customer','SKU','Item','Category','Type','Description'];
+        for (const p of prefs) {
+            const c = cols.find(col => col.toLowerCase().includes(p.toLowerCase()));
+            if (c) return c;
+        }
+        return cols[0];
+    },
+
+    answer: function(question) {
+        const q = question.toLowerCase().trim();
+        if (!Object.keys(DATA).length) return "No data loaded yet. Please sync the dashboard first.";
+
+        if (/\b(help|what can you|how to use|what do you)\b/i.test(q)) {
+            return "I'm **Halo**, your offline data agent. I can answer questions about your supply chain data.\n\n" +
+                "**Try asking:**\n" +
+                "- \"Total cost this month\"\n" +
+                "- \"Top 5 hubs by inbound cases\"\n" +
+                "- \"Cost trend over time\"\n" +
+                "- \"Latest damages\"\n" +
+                "- \"Average truck turnaround time\"\n" +
+                "- \"Show storage breakdown\"\n" +
+                "- \"How many quality issues?\"\n" +
+                "- \"Bottom 3 vendors by complaints\"\n" +
+                "- \"What datasets are available?\"\n\n" +
+                "I work entirely offline — no API keys needed.";
+        }
+
+        if (/\b(dataset|available|what data|which data|tables?)\b/i.test(q)) {
+            const lines = [];
+            for (const [k, rows] of Object.entries(DATA)) {
+                if (!Array.isArray(rows) || !rows.length) continue;
+                const cols = Object.keys(rows[0]);
+                lines.push(`**${k}**: ${rows.length} rows — ${cols.slice(0,5).join(', ')}${cols.length>5 ? '...' : ''}`);
+            }
+            return "**Available datasets:**\n" + lines.join('\n');
+        }
+
+        const datasets = this._detectDatasets(q);
+        const intent = this._detectIntent(q);
+
+        if (!datasets) {
+            const allKeys = Object.keys(DATA).filter(k => Array.isArray(DATA[k]) && DATA[k].length);
+            if (!allKeys.length) return "No data loaded. Please sync.";
+            const summaryLines = [];
+            for (const k of allKeys.slice(0, 8)) {
+                summaryLines.push(`**${k}**: ${DATA[k].length} rows`);
+            }
+            return "I couldn't match your question to a specific dataset. Here's what's loaded:\n\n" +
+                summaryLines.join('\n') + (allKeys.length > 8 ? `\n...and ${allKeys.length-8} more` : '') +
+                "\n\nTry mentioning a topic: cost, stock, inbound, outbound, damage, truck, storage, freight, quality, orders, etc.";
+        }
+
+        const results = [];
+        for (const dsName of datasets) {
+            const rows = DATA[dsName];
+            if (!Array.isArray(rows) || !rows.length) continue;
+            const mCol = this._months(rows);
+            const valCol = this._detectValueCol(rows, q);
+            const groupCol = this._detectGroupCol(rows, q);
+
+            if (intent === 'trend' && mCol && valCol) {
+                const t = this._trend(rows, mCol, valCol);
+                if (t) {
+                    const dir = t.change > 0 ? '📈 increased' : t.change < 0 ? '📉 decreased' : '➡️ stayed flat';
+                    results.push(`**${dsName} — ${valCol} trend:**\n` +
+                        `${t.prevMonth}: **${this._fmt(t.prev)}** → ${t.lastMonth}: **${this._fmt(t.last)}**\n` +
+                        `${dir} by **${Math.abs(t.change).toFixed(1)}%**`);
+                }
+            } else if (intent === 'top') {
+                const nMatch = q.match(/top\s*(\d+)/i);
+                const n = nMatch ? parseInt(nMatch[1]) : 5;
+                const top = this._topN(rows, valCol, n, false);
+                if (top.length) {
+                    const lines = top.map((t,i) => `${i+1}. ${t.row[groupCol] || '—'}: **${this._fmt(t.val)}** ${valCol}`);
+                    results.push(`**Top ${top.length} in ${dsName} by ${valCol}:**\n` + lines.join('\n'));
+                }
+            } else if (intent === 'bottom') {
+                const nMatch = q.match(/bottom\s*(\d+)/i);
+                const n = nMatch ? parseInt(nMatch[1]) : 3;
+                const bottom = this._topN(rows, valCol, n, true);
+                if (bottom.length) {
+                    const lines = bottom.map((t,i) => `${i+1}. ${t.row[groupCol] || '—'}: **${this._fmt(t.val)}** ${valCol}`);
+                    results.push(`**Bottom ${bottom.length} in ${dsName} by ${valCol}:**\n` + lines.join('\n'));
+                }
+            } else if (intent === 'total') {
+                const agg = this._agg(rows, valCol);
+                if (agg) {
+                    results.push(`**${dsName} — ${valCol}:**\nTotal: **${this._fmt(agg.sum)}** across ${agg.count} records`);
+                }
+            } else if (intent === 'average') {
+                const agg = this._agg(rows, valCol);
+                if (agg) {
+                    results.push(`**${dsName} — ${valCol}:**\nAverage: **${this._fmt(agg.avg)}** (from ${agg.count} records)\nRange: ${this._fmt(agg.min)} – ${this._fmt(agg.max)}`);
+                }
+            } else if (intent === 'latest') {
+                const latest = mCol ? this._latest(rows, mCol) : rows.slice(-5);
+                const cols = Object.keys(rows[0]);
+                const showCols = cols.slice(0, 6);
+                const lines = latest.slice(0, 8).map(r => showCols.map(c => `${c}: ${r[c] || '—'}`).join(' | '));
+                const label = mCol && latest[0] ? latest[0][mCol] : 'recent';
+                results.push(`**${dsName} — latest (${label}):** ${latest.length} rows\n` + lines.join('\n'));
+            } else if (intent === 'list') {
+                const cols = Object.keys(rows[0]);
+                const showCols = cols.slice(0, 5);
+                const show = rows.slice(-8);
+                const lines = show.map(r => showCols.map(c => `${c}: ${r[c] || '—'}`).join(' | '));
+                results.push(`**${dsName}** (${rows.length} rows, showing last ${show.length}):\n` + lines.join('\n'));
+            } else {
+                const agg = valCol ? this._agg(rows, valCol) : null;
+                const mCol2 = mCol;
+                let summary = `**${dsName}**: ${rows.length} rows`;
+                if (agg) summary += `\n${valCol}: Total **${this._fmt(agg.sum)}**, Avg **${this._fmt(agg.avg)}**, Range ${this._fmt(agg.min)}–${this._fmt(agg.max)}`;
+                if (mCol2) {
+                    const months = [...new Set(rows.map(r => r[mCol2]).filter(Boolean))];
+                    summary += `\nMonths covered: ${months[0]} to ${months[months.length-1]} (${months.length} months)`;
+                }
+                results.push(summary);
+            }
+        }
+
+        if (!results.length) return "I found the datasets but couldn't extract meaningful data for your question. Try being more specific — e.g., \"total cost\" or \"top 5 hubs by inbound\".";
+        return results.join('\n\n');
+    }
+};
+
+function sendHaloMsg() {
     const input = document.getElementById('haloChatInput');
     const q = input.value.trim();
     if (!q) return;
-    if (!_haloReady) {
-        document.getElementById('haloSetup').style.display = 'block';
-        showToast('Please set up your API key first', 'var(--rust)', 2000);
-        return;
-    }
-
     input.value = '';
     addHaloMsg(q, 'user');
-    const sendBtn = document.getElementById('haloSendBtn');
-    sendBtn.disabled = true;
-    input.disabled = true;
-
-    const body = document.getElementById('haloChatBody');
-    const typing = document.createElement('div');
-    typing.className = 'halo-typing';
-    typing.textContent = 'Halo is thinking...';
-    body.appendChild(typing);
-    body.scrollTop = body.scrollHeight;
-
-    try {
-        const res = await fetch('/api/chat', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({question: q, history: _haloHistory.slice(-10)})
-        });
-        typing.remove();
-
-        const data = await res.json();
-        if (data.error) {
-            if (data.error.includes('INVALID_KEY')) {
-                document.getElementById('haloSetup').style.display = 'block';
-                _haloReady = false;
-                addHaloMsg('API key is invalid. Please enter a valid Groq key above.', 'error');
-            } else {
-                addHaloMsg(data.error, 'error');
-            }
-        } else {
-            _haloHistory.push({role: 'user', content: q});
-            _haloHistory.push({role: 'assistant', content: data.answer});
-            addHaloMsg(data.answer, 'bot');
-        }
-    } catch(e) {
-        typing.remove();
-        addHaloMsg('Cannot reach the server. Make sure the dashboard server is running.', 'error');
-    } finally {
-        sendBtn.disabled = false;
-        input.disabled = false;
-        input.focus();
-    }
+    const answer = _haloAgent.answer(q);
+    addHaloMsg(answer, 'bot');
+    input.focus();
 }
 
 // ==================== INIT ====================
