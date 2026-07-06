@@ -210,7 +210,6 @@ tbody td:first-child{font-weight:700;color:var(--teal)}
 <button data-tab="orders">Orders &amp; Service Levels</button>
 <button data-tab="copacking">Co-Packing Performance</button>
 <button data-tab="environment">Environmental Monitoring</button>
-<button data-tab="validation">Data Validation</button>
 <button data-tab="maintenance">Maintenance Guide</button>
 </div>
 
@@ -597,19 +596,6 @@ tbody td:first-child{font-weight:700;color:var(--teal)}
 </div>
 
 <!-- ========== TAB: DATA VALIDATION ========== -->
-<div class="page" id="page-validation">
-<div class="page-title">Data Validation Protocol</div>
-<div class="page-sub">One-by-one integrity check for every sheet in the Monthly Review Meeting workbook</div>
-
-<div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
-<button id="btnRunValidation" onclick="runValidation()" style="background:var(--teal);color:#fff;border:none;padding:10px 24px;border-radius:6px;font:600 14px Calibri,sans-serif;cursor:pointer">&#9654; Run Full Validation</button>
-<span id="validationStatus" style="font:13px Calibri,sans-serif;color:#888"></span>
-</div>
-
-<div id="validationSummaryCards" class="card-row"></div>
-
-<div id="validationResults" style="margin-top:12px"></div>
-</div>
 
 <!-- ========== TAB: MAINTENANCE GUIDE ========== -->
 <div class="page" id="page-maintenance">
@@ -1217,8 +1203,7 @@ function renderTab(tabId) {
         freight: renderFreight,
         orders: renderOrders,
         copacking: renderCoPacking,
-        environment: renderEnvironment,
-        validation: renderValidation
+        environment: renderEnvironment
     };
     if (map[tabId]) map[tabId]();
 }
@@ -1233,6 +1218,7 @@ function initDashboard() {
     populateExecRegion();
     renderExecutive();
     renderedTabs.add('executive');
+    setTimeout(runAutoValidation, 500);
 }
 
 function populateExecRegion() {
@@ -3257,97 +3243,24 @@ function validateDataset(key, rules) {
 
 let _validationResults = [];
 
-function renderValidation() {
-    const el = document.getElementById('validationResults');
-    if (_validationResults.length === 0) {
-        el.innerHTML = '<div style="color:#888;font:14px Calibri;padding:20px;text-align:center">Click <strong>Run Full Validation</strong> to check all sheets.</div>';
-        document.getElementById('validationSummaryCards').innerHTML = '';
-    }
-}
-
-function runValidation() {
-    const btn = document.getElementById('btnRunValidation');
-    const status = document.getElementById('validationStatus');
-    const container = document.getElementById('validationResults');
-    btn.disabled = true;
-    btn.textContent = '⏳ Validating...';
-    container.innerHTML = '';
+function runAutoValidation() {
     _validationResults = [];
-
     const keys = Object.keys(VALIDATION_RULES);
-    let idx = 0;
-
-    function processNext() {
-        if (idx >= keys.length) {
-            btn.disabled = false;
-            btn.innerHTML = '&#9654; Run Full Validation';
-            renderValidationSummary();
-            status.textContent = `Completed: ${keys.length} datasets checked at ${new Date().toLocaleTimeString()}`;
-            return;
-        }
-        const key = keys[idx];
-        const rules = VALIDATION_RULES[key];
-        status.textContent = `Checking ${idx+1}/${keys.length}: ${rules.label}...`;
-        const result = validateDataset(key, rules);
-        _validationResults.push(result);
-        container.appendChild(buildResultCard(result, idx+1));
-        idx++;
-        setTimeout(processNext, 30);
-    }
-    processNext();
-}
-
-function renderValidationSummary() {
+    keys.forEach(key => {
+        _validationResults.push(validateDataset(key, VALIDATION_RULES[key]));
+    });
     const passed = _validationResults.filter(r => r.status === 'pass').length;
     const warned = _validationResults.filter(r => r.status === 'warn').length;
     const failed = _validationResults.filter(r => r.status === 'fail' || r.status === 'missing' || r.status === 'empty').length;
     const totalIssues = _validationResults.reduce((s,r) => s + r.errors.length + r.warnings.length, 0);
 
-    document.getElementById('validationSummaryCards').innerHTML =
-        makeCard('Datasets Checked', String(_validationResults.length), 'Total sheets validated') +
-        makeCard('Passed', String(passed), 'No issues found', null, '') +
-        makeCard('Warnings', String(warned), 'Minor issues detected', null, 'orange') +
-        makeCard('Failed', String(failed), `${totalIssues} total issues`, null, 'orange');
-}
-
-function buildResultCard(result, index) {
-    const statusIcon = {pass:'&#10004;', warn:'&#9888;', fail:'&#10008;', missing:'&#10008;', empty:'&#10008;'}[result.status];
-    const statusColor = {pass:'#2E7D32', warn:'#E65100', fail:'#C62828', missing:'#C62828', empty:'#C62828'}[result.status];
-    const statusLabel = {pass:'PASSED', warn:'WARNINGS', fail:'FAILED', missing:'MISSING', empty:'EMPTY'}[result.status];
-
-    const card = document.createElement('div');
-    card.style.cssText = 'background:#fff;border-radius:8px;margin-bottom:10px;border-left:4px solid '+statusColor+';overflow:hidden';
-
-    let issuesHTML = '';
-    const allIssues = [...result.errors, ...result.warnings, ...result.info];
-    if (allIssues.length > 0) {
-        const issueRows = allIssues.map(iss => {
-            const ic = {error:'#C62828',warning:'#E65100',info:'#1565C0'}[iss.severity];
-            const il = {error:'ERROR',warning:'WARNING',info:'INFO'}[iss.severity];
-            return `<div style="display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-bottom:1px solid #f0f0f0">
-                <span style="background:${ic};color:#fff;font:600 10px Calibri;padding:2px 6px;border-radius:3px;white-space:nowrap">${il}</span>
-                <span style="font:13px Calibri;color:#333;flex:1">${iss.msg}${iss.row ? ` <span style="color:#999">(row ${iss.row})</span>` : ''}</span>
-            </div>`;
-        }).join('');
-        issuesHTML = `<div id="valIssues${index}" style="display:none;padding:8px 16px 12px;background:#fafafa;border-top:1px solid #eee">${issueRows}</div>`;
+    if (failed > 0) {
+        showToast(`Validation: ${failed} failed, ${warned} warnings, ${passed} passed (${totalIssues} issues)`, 'var(--rust)', 5000);
+    } else if (warned > 0) {
+        showToast(`Validation: ${passed} passed, ${warned} warnings`, 'var(--orange)', 4000);
+    } else {
+        showToast(`Validation: All ${passed} datasets passed`, 'var(--green)', 3000);
     }
-
-    card.innerHTML = `
-        <div onclick="this.nextElementSibling&&(this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none')" style="display:flex;align-items:center;padding:12px 16px;cursor:${allIssues.length?'pointer':'default'};gap:12px">
-            <span style="font:600 14px Calibri;color:#999;min-width:28px">#${index}</span>
-            <span style="font:600 14px Calibri;color:${statusColor};min-width:24px">${statusIcon}</span>
-            <div style="flex:1">
-                <div style="font:600 14px Calibri;color:#333">${result.label}</div>
-                <div style="font:12px Calibri;color:#888">${result.nonEmpty} rows${result.total !== result.nonEmpty ? ` (${result.total} total)` : ''} &bull; Sheet: ${result.sheet}</div>
-            </div>
-            <span style="background:${statusColor};color:#fff;font:600 11px Calibri;padding:3px 10px;border-radius:4px">${statusLabel}</span>
-            ${result.errors.length ? `<span style="background:#C62828;color:#fff;font:600 11px Calibri;padding:3px 8px;border-radius:4px">${result.errors.length} errors</span>` : ''}
-            ${result.warnings.length ? `<span style="background:#E65100;color:#fff;font:600 11px Calibri;padding:3px 8px;border-radius:4px">${result.warnings.length} warnings</span>` : ''}
-            ${result.info.length ? `<span style="background:#1565C0;color:#fff;font:600 11px Calibri;padding:3px 8px;border-radius:4px">${result.info.length} info</span>` : ''}
-            ${allIssues.length ? '<span style="font:12px Calibri;color:#999">▸</span>' : ''}
-        </div>
-        ${issuesHTML}`;
-    return card;
 }
 
 // ==================== EXCEL INTEGRATION ====================
