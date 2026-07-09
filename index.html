@@ -813,8 +813,12 @@ function fixAllDates() {
     for (const [ds, key] of dailyFields) {
         if (DATA[ds]) DATA[ds].forEach(r => { if (r[key]) r[key] = excelDateToDMY(r[key]); });
     }
-    // Also fix MFD/Expiry dates in expiredStock
+    // Also fix MFD/Expiry dates in expiredStock and whDamages
     if (DATA.expiredStock) DATA.expiredStock.forEach(r => {
+        if (r['MFD Date']) r['MFD Date'] = excelDateToDMY(r['MFD Date']);
+        if (r['Expiry Date']) r['Expiry Date'] = excelDateToDMY(r['Expiry Date']);
+    });
+    if (DATA.whDamages) DATA.whDamages.forEach(r => {
         if (r['MFD Date']) r['MFD Date'] = excelDateToDMY(r['MFD Date']);
         if (r['Expiry Date']) r['Expiry Date'] = excelDateToDMY(r['Expiry Date']);
     });
