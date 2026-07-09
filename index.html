@@ -807,7 +807,8 @@ function fixAllDates() {
     }
     // Daily date fields -> DD-MM-YYYY format
     const dailyFields = [
-        ['tempReport','Date'], ['customerComplaints','Date'], ['inboundIssues','Date']
+        ['tempReport','Date'], ['customerComplaints','Date'], ['inboundIssues','Date'],
+        ['inboundDetail','Created At']
     ];
     for (const [ds, key] of dailyFields) {
         if (DATA[ds]) DATA[ds].forEach(r => { if (r[key]) r[key] = excelDateToDMY(r[key]); });
