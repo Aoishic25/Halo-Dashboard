@@ -799,7 +799,8 @@ function fixAllDates() {
         ['storage','Month'], ['hubInbound','Date'], ['hubOutbound','Month Name'],
         ['coPacking','Month Name'], ['coPacking','Month'], ['expiredStock','Month Name'], ['inbGrnMonthly','Month-Year'],
         ['freights','Month'], ['copackingOrders','Month'],
-        ['subjects','MonthYear'], ['ytdTrends','Month'], ['fzeSkuGw','Year - Month']
+        ['subjects','MonthYear'], ['ytdTrends','Month'], ['fzeSkuGw','Year - Month'],
+        ['truckTurnover','Month']
     ];
     for (const [ds, key] of monthFields) {
         if (DATA[ds]) DATA[ds].forEach(r => { if (r[key]) r[key] = excelDateToMonYY(r[key]); });
