@@ -1435,7 +1435,7 @@ function renderKPI() {
     const ttAll = gf(DATA.truckTurnover||[], 'Month');
     const qi = gf(DATA.qualityIssues||[], 'Month');
     const wc = gf(DATA.waitingCharges||[], 'Month');
-    const frAll = gf(DATA.freights||[], 'Month');
+    const frAll = gf(DATA.freights||[], 'Month').filter(r => num(r['Total Freight']) > 0 || num(r['Total Cases']) > 0);
 
     const latestSF = sf.length ? sf[sf.length-1] : {};
     const prevSF = sf.length > 1 ? sf[sf.length-2] : {};
@@ -2521,7 +2521,7 @@ function resetFrFilter() {
 function renderFreight() {
     populateFrFilter();
     const {country, equip} = getFrFilter();
-    let fr = gf(((typeof DATA2!=='undefined'&&DATA2?.freights) || DATA.freights), 'Month');
+    let fr = gf(((typeof DATA2!=='undefined'&&DATA2?.freights) || DATA.freights), 'Month').filter(r => num(r['Total Freight']) > 0 || num(r['Total Cases']) > 0);
     if (country !== 'all') fr = fr.filter(r => (r.Country||'') === country);
     if (equip !== 'all') fr = fr.filter(r => (r.Equipment||'') === equip);
     const wc = gf(DATA.waitingCharges, 'Month&Year');
