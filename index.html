@@ -371,7 +371,7 @@ tbody td:first-child{font-weight:700;color:var(--teal)}
 
 <div class="section-divider">Recent Inbound Detail (GRNs)</div>
 <div class="tbl-wrap"><div class="tbl-scroll"><table id="tblInbDetail">
-<thead><tr><th>Client</th><th>GRN No</th><th>Vendor</th><th>Description</th><th>SKU</th><th>Cases</th><th>Created At</th><th>Year</th></tr></thead>
+<thead><tr><th>Client</th><th>GRN No</th><th>Vendor</th><th>Description</th><th>SKU</th><th>Cases</th><th>Created At</th></tr></thead>
 <tbody></tbody>
 </table></div></div>
 </div>
@@ -821,6 +821,17 @@ function fixAllDates() {
     if (DATA.whDamages) DATA.whDamages.forEach(r => {
         if (r['MFD Date']) r['MFD Date'] = excelDateToDMY(r['MFD Date']);
         if (r['Expiry Date']) r['Expiry Date'] = excelDateToDMY(r['Expiry Date']);
+    });
+    // truckTurnover: derive Mon-YY from Physical Received Date for rows with text-only Month
+    if (DATA.truckTurnover) DATA.truckTurnover.forEach(r => {
+        const m = String(r.Month||'');
+        if (/^[A-Za-z]/.test(m) && r['Physical Received Date']) {
+            const prd = String(r['Physical Received Date']);
+            const n = parseFloat(prd);
+            if (!isNaN(n) && n > 30000 && n < 60000) {
+                r.Month = excelDateToMonYY(prd);
+            }
+        }
     });
 }
 
@@ -1973,7 +1984,7 @@ function renderWarehouse() {
     const inbDetRaw = gf(DATA.inboundDetail || [], 'Year');
     const inbDet = vendor !== 'all' ? inbDetRaw.filter(r => matchVendor(r['Vendor Name'], vendor)) : inbDetRaw;
     inbDet.slice(-50).reverse().forEach(r => {
-        idTb.innerHTML += `<tr><td>${r.Client||''}</td><td>${r['GRN No']||''}</td><td>${(r['Vendor Name']||'').substring(0,25)}</td><td>${(r.Description||'').substring(0,35)}</td><td>${r['SKU No 2']||''}</td><td>${r['Quantity in Cases']||''}</td><td>${r['Created At']||''}</td><td>${r.Year||''}</td></tr>`;
+        idTb.innerHTML += `<tr><td>${r.Client||''}</td><td>${r['GRN No']||''}</td><td>${(r['Vendor Name']||'').substring(0,25)}</td><td>${(r.Description||'').substring(0,35)}</td><td>${r['SKU No 2']||''}</td><td>${r['Quantity in Cases']||''}</td><td>${r['Created At']||''}</td></tr>`;
     });
 }
 
