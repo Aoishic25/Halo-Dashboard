@@ -15,7 +15,6 @@ PORT = int(os.environ.get('PORT', 8765))
 ROOT = os.path.dirname(os.path.abspath(__file__))
 EXCEL_DIR = os.path.join(ROOT, 'Ops files')
 EXCEL_PATH = os.path.join(EXCEL_DIR, 'Monthly Review Meeting.xlsx')
-EXTRACT_SCRIPT = os.path.join(ROOT, '_extract_data.ps1')
 DATA_BLOCK = os.path.join(ROOT, '_data_block.js')
 CLOUDFLARED = os.path.join(ROOT, 'cloudflared.exe')
 MAX_UPLOAD_SIZE = 50 * 1024 * 1024
@@ -24,7 +23,7 @@ extract_status = {'running': False, 'last_run': 0, 'last_error': None, 'last_mti
 OLLAMA_URL = 'http://localhost:11434/api/chat'
 OLLAMA_MODEL = 'llama3.2:3b'
 GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
-GROQ_MODEL = 'llama-3.3-70b-versatile'
+GROQ_MODEL = 'openai/gpt-oss-20b'
 GROQ_KEY_FILE = os.path.join(ROOT, '.groq_key')
 _data_context = ''
 _full_data = {}
@@ -56,15 +55,7 @@ def build_data_context():
             if not isinstance(rows, list) or not rows:
                 continue
             cols = list(rows[0].keys())
-            lines.append(f'{key}: {len(rows)} rows, cols={",".join(cols[:5])}')
-            num_totals = {}
-            for c in cols[:6]:
-                vals_list = [_num(r.get(c)) for r in rows]
-                total = sum(vals_list)
-                if total != 0 and any(v != 0 for v in vals_list[:3]):
-                    num_totals[c] = f'{total:,.0f}'
-            if num_totals:
-                lines.append(f'  Totals: {num_totals}')
+            lines.append(f'{key}({len(rows)}): {",".join(cols[:5])}')
         _data_context = '\n'.join(lines)
         print(f'Data context built: {len(_data_context):,} chars')
     except Exception as e:
@@ -107,17 +98,81 @@ def get_relevant_data(question):
     if not matched:
         matched = set(list(_full_data.keys())[:5])
 
+    month_names = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec']
+    q_month = q_year = q_yy = None
+    for i, mn in enumerate(month_names):
+        if mn in q:
+            q_month = mn
+            break
+    import re as _re
+    from datetime import datetime as _dt, timedelta as _td
+    yr_match = _re.search(r'20(2[0-9])', q)
+    if yr_match:
+        q_year = yr_match.group(0)
+        q_yy = yr_match.group(1)
+    EXCEL_EPOCH = _dt(1899, 12, 30)
+
+    def _date_match(v):
+        s = str(v).strip().lower()
+        if not s:
+            return False
+        if q_month and s.startswith(q_month):
+            if not q_yy or q_yy in s or q_year in s:
+                return True
+        if q_year and q_year in s:
+            return True
+        if q_yy and _re.match(r'^[a-z]{3}-' + q_yy + r'$', s):
+            if not q_month or s.startswith(q_month):
+                return True
+        try:
+            serial = int(s)
+            if 40000 < serial < 60000:
+                dt = EXCEL_EPOCH + _td(days=serial)
+                if q_month and month_names[dt.month - 1] != q_month:
+                    return False
+                if q_year and str(dt.year) != q_year:
+                    return False
+                return True
+        except (ValueError, OverflowError):
+            pass
+        return False
+
     lines = []
     for key in matched:
         rows = _full_data.get(key, [])
         if not rows:
             continue
         cols = list(rows[0].keys())
-        lines.append(f'\n## {key} ({len(rows)} rows)')
-        show = rows[-10:] if len(rows) > 10 else rows
+        filtered = rows
+        if q_month or q_year:
+            filtered = [r for r in rows if any(_date_match(r.get(c, '')) for c in cols)]
+            if not filtered:
+                filtered = rows[-10:]
+        lines.append(f'\n## {key} ({len(filtered)}/{len(rows)} rows)')
+        num_cols = {}
+        for c in cols:
+            vals = [_num(r.get(c)) for r in filtered]
+            total = sum(vals)
+            if total != 0:
+                avg = total / max(len([v for v in vals if v != 0]), 1)
+                num_cols[c] = f'sum={total:,.1f},avg={avg:,.1f}'
+        if num_cols:
+            lines.append('  Stats: ' + '; '.join(f'{c}:{v}' for c, v in list(num_cols.items())[:4]))
+        mo_abbrs = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+        def _fmt(v):
+            s = str(v).strip()
+            try:
+                n = int(s)
+                if 40000 < n < 60000:
+                    dt = EXCEL_EPOCH + _td(days=n)
+                    return f'{mo_abbrs[dt.month-1]}-{dt.year}'
+            except (ValueError, OverflowError):
+                pass
+            return s
+        show = filtered[:5] if len(filtered) > 5 else filtered
         for r in show:
-            vals = [f'{c}={r[c]}' for c in cols if r.get(c)]
-            lines.append('  ' + ' | '.join(vals))
+            vals = [f'{c}={_fmt(r[c])}' for c in cols if r.get(c)]
+            lines.append('  ' + ' | '.join(vals[:6]))
     return '\n'.join(lines)
 
 
@@ -290,10 +345,12 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
                     pass
             self.send_json({'hasKey': has_key, 'ollamaRunning': ollama_ok, 'dataLoaded': bool(_data_context)})
         else:
-            if self.path == '/.groq_key':
+            allowed_ext = ('.html', '.js', '.css', '.json', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico', '.avif', '.webp', '.woff', '.woff2', '.ttf', '.eot')
+            p = self.path.split('?')[0].split('#')[0]
+            if p == '/' or p.lower().endswith(allowed_ext):
+                super().do_GET()
+            else:
                 self.send_error(403, 'Forbidden')
-                return
-            super().do_GET()
 
     def do_POST(self):
         if self.path == '/api/chat':
@@ -367,11 +424,10 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
 
             relevant = get_relevant_data(question)
             system_msg = (
-                'You are Halo, data analyst for HALO Supply Chain Dashboard '
-                '(Himalaya Wellness, METAP Region). Answer ONLY from the data below. '
-                'Be concise. Format numbers with commas.\n\n'
-                'AVAILABLE DATASETS:\n' + _data_context + '\n\n'
-                'RELEVANT DATA:\n' + relevant
+                'You are Halo, a supply chain data assistant. '
+                'Answer from the data below. Be concise. Do not use <think> tags.\n'
+                'DATASETS:\n' + _data_context + '\n'
+                'DATA:\n' + relevant
             )
 
             messages = [{'role': 'system', 'content': system_msg}]
@@ -403,7 +459,7 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
             'model': GROQ_MODEL,
             'messages': messages,
             'temperature': 0.1,
-            'max_tokens': 1024
+            'max_tokens': 4096
         }).encode()
         req = urllib.request.Request(
             GROQ_URL, data=payload,
@@ -413,7 +469,13 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
         try:
             with urllib.request.urlopen(req, timeout=30) as res:
                 result = json.loads(res.read())
-                return result['choices'][0]['message']['content']
+                raw = result['choices'][0]['message']['content'] or ''
+                content = re.sub(r'<think>[\s\S]*?</think>\s*', '', raw).strip()
+                if not content and '<think>' in raw:
+                    content = re.sub(r'<think>[\s\S]*', '', raw).strip()
+                if not content:
+                    content = re.sub(r'<[^>]+>', '', raw).strip()
+                return content or 'I found data but could not generate a summary. Try rephrasing your question.'
         except urllib.error.HTTPError as e:
             body = e.read().decode() if e.fp else ''
             if e.code in (401, 403):
@@ -438,8 +500,7 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
             return result.get('message', {}).get('content', 'No response.')
 
     def end_headers(self):
-        if self.path and '_data_block' in self.path:
-            self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+        self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
         super().end_headers()
 
     def send_json(self, data, code=200):
@@ -447,7 +508,6 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
         self.send_response(code)
         self.send_header('Content-Type', 'application/json')
         self.send_header('Content-Length', len(body))
-        self.send_header('Cache-Control', 'no-cache')
         self.end_headers()
         self.wfile.write(body)
 

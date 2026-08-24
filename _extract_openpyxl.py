@@ -38,18 +38,28 @@ def cell_to_str(raw):
     return str(raw)
 
 
-def extract_sheet(wb, sheet_name, max_rows, header_row=1, start_col=1, end_col=None):
+def extract_sheet(wb, sheet_name, max_rows, header_row=1, start_col=1, end_col=None, from_end=False):
     if sheet_name not in wb.sheetnames:
         return []
     ws = wb[sheet_name]
     if end_col is None:
         end_col = ws.max_column or 1
-    actual_max_row = min(ws.max_row or 1, max_rows + header_row)
+    total_rows = ws.max_row or 1
+    if from_end and total_rows > max_rows + header_row:
+        data_start = total_rows - max_rows + 1
+    else:
+        data_start = header_row + 1
+    actual_max_row = min(total_rows, data_start + max_rows - 1) if from_end else min(total_rows, max_rows + header_row)
 
-    all_rows = list(ws.iter_rows(
-        min_row=header_row, max_row=actual_max_row,
+    header_rows = list(ws.iter_rows(
+        min_row=header_row, max_row=header_row,
         min_col=start_col, max_col=end_col
     ))
+    data_rows = list(ws.iter_rows(
+        min_row=data_start if from_end else header_row + 1, max_row=actual_max_row,
+        min_col=start_col, max_col=end_col
+    ))
+    all_rows = header_rows + data_rows
     if not all_rows:
         return []
 
@@ -81,30 +91,30 @@ SHEET_MAP = {
     'waitingCharges':     ('8. Waiting Charges', 1100, 1, 16, 32),
     'weeklyOrders':       ('5. Week-wise Orders Details', 200, 1, 1, None),
     'damages':            ('4. % of Damages', 200, 3, 1, None),
-    'qualityIssues':      ('3. Quality Issues', 1000, 1, 1, None),
-    'manualOrders':       ('6. Manual orders', 1100, 1, 1, None),
-    'palletAging':        ('13. Mov. Ageing', 1200, 1, 1, None),
+    'qualityIssues':      ('3. Quality Issues', 1500, 1, 1, None),
+    'manualOrders':       ('6. Manual orders', 2000, 1, 1, None),
+    'palletAging':        ('13. Mov. Ageing', 11000, 1, 1, None),
     'copackingWeekly':    ('29. COPACKING ORDERS-WEEK WISE', 200, 1, 1, None),
     'whDamages':          ('12. WH Handling Damages', 200, 1, 1, None),
     'inboundFlow':        ('16. Inbound Flow-25', 300, 1, 1, 4),
     'invoiceSummary':     ('24. WH Invoice Summary', 300, 1, 1, None),
     'tempReport':         ('20. Temp report', 1100, 1, 1, None),
-    'subjects':           ('1. Subjects', 300, 1, 1, None),
+    'subjects':           ('1. Subjects', 600, 1, 1, None),
     'hubInbound':         ('15. Hubwise Inbound Summary', 1100, 1, 1, None),
     'hubOutbound':        ('18. Hubwise Outbound Summary', 700, 1, 1, None),
     'storage':            ('10. Storage', 1100, 1, 16, 45),
     'storageHub':         ('10. Storage', 50, 1, 1, 14),
     'copackingOrders':    ('28. Co-Packing Orders', 700, 1, 1, 4),
-    'coPacking':          ('26. Co-Packing', 1400, 1, 1, None),
+    'coPacking':          ('26. Co-Packing', 1800, 1, 1, None),
     'customerComplaints': ('27. Customers Complaints', 1100, 1, 1, None),
     'inboundIssues':      ('25. Inbound Issues', 300, 1, 1, None),
     'inbGrnMonthly':      ('2. Inbound Plan vs GRN', 1100, 1, 8, 18),
     'expiredStock':       ('11. Expiry & Near Expire', 1400, 1, 1, None),
     'freights':           ('7. Freights', 1100, 1, 1, None),
-    'outboundCases':      ('22. Outbound Summary', 1100, 1, 1, None),
-    'truckTurnover':      ('9. Truck Turnover Time', 3600, 1, 1, None),
+    'outboundCases':      ('22. Outbound Summary', 1600, 1, 1, None),
+    'truckTurnover':      ('9. Truck Turnover Time', 4000, 1, 1, None),
     'inboundSummary':     ('17. Inbound Summary', 300, 1, 1, None),
-    'inboundDetail':      ('21. Inbound Detail', 2000, 1, 1, None),
+    'inboundDetail':      ('21. Inbound Detail', 15000, 1, 1, None, True),
     'ytdTrends':          ('23. YTD Trends', 400, 1, 1, None),
     'fzeSkuGw':           ("30. FZE SKU's GW Details", 100, 1, 1, None),
 }
@@ -125,11 +135,15 @@ def run_extraction(excel_path=None, output_path=None, on_progress=None):
     all_data = {}
     total = len(SHEET_MAP)
     for i, (key, params) in enumerate(SHEET_MAP.items(), 1):
-        sheet_name, max_rows, header_row, start_col, end_col = params
+        from_end = False
+        if len(params) == 6:
+            sheet_name, max_rows, header_row, start_col, end_col, from_end = params
+        else:
+            sheet_name, max_rows, header_row, start_col, end_col = params
         if on_progress:
             on_progress(f'[{i}/{total}] {key}', i, total)
         print(f'  [{i}/{total}] Extracting: {key} ({sheet_name})...')
-        rows = extract_sheet(wb, sheet_name, max_rows, header_row, start_col, end_col)
+        rows = extract_sheet(wb, sheet_name, max_rows, header_row, start_col, end_col, from_end=from_end)
         all_data[key] = rows
 
     if on_progress:

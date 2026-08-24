@@ -6,8 +6,9 @@
 <title>HALO AI - Supply Chain Command Centre</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-treemap@2.3.1/dist/chartjs-chart-treemap.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="compromise.min.js"></script>
 <script>document.write('<script src="_data_block.js?v='+Date.now()+'"><\/script>');</script>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -169,7 +170,7 @@ tbody td:first-child{font-weight:700;color:var(--teal)}
 <button class="upload-btn" id="syncBtn" onclick="syncData()" title="Extract & reload data from Excel">&#x21BB; Sync</button>
 <label id="watchLabel" style="font:11px Calibri;color:#fff;cursor:pointer;display:flex;align-items:center;gap:4px" title="Auto-sync when Excel file is saved"><input type="checkbox" id="autoWatch" style="accent-color:var(--green)"> Auto</label>
 </div>
-<button class="ask-halo-btn" onclick="toggleHaloChat()" title="Ask Halo AI about your data"><svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.2L4 17.2V4h16v12z"/><path d="M7 9h2v2H7zm4 0h2v2h11zm4 0h2v2h-2z"/></svg> Ask Halo</button>
+<button class="ask-halo-btn" onclick="toggleHaloChat()" title="Ask Halo AI about your data"><svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.2L4 17.2V4h16v12z"/><path d="M7 9h2v2H7zm4 0h2v2H11zm4 0h2v2h-2z"/></svg> Ask Halo</button>
 </div>
 </div>
 
@@ -186,10 +187,11 @@ tbody td:first-child{font-weight:700;color:var(--teal)}
 <div class="halo-chat-header">
 <svg width="24" height="24" viewBox="0 0 24 24" fill="var(--orange)"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.2L4 17.2V4h16v12z"/></svg>
 <h3>Ask <span>Halo</span></h3>
+<label style="font:11px Calibri,sans-serif;color:#fff;display:flex;align-items:center;gap:4px;margin-left:auto;cursor:pointer" title="Use AI (Groq LLM) for smarter answers"><input type="checkbox" id="haloAiToggle" style="accent-color:var(--orange)"> AI</label>
 <button class="halo-chat-close" onclick="toggleHaloChat()">&times;</button>
 </div>
 <div class="halo-chat-body" id="haloChatBody">
-<div class="halo-msg bot">Hi! I'm <strong>Halo</strong>, your data agent. I work entirely offline — no API keys needed. Ask me about costs, stock, inbound/outbound, damages, orders, storage, trucks, or any KPI.</div>
+<div class="halo-msg bot">Hi! I'm <strong>Halo</strong>, your data agent. Ask me about costs, stock, inbound/outbound, damages, orders, storage, trucks, or any KPI. Toggle <strong>AI</strong> above for smarter answers powered by Groq.</div>
 </div>
 <div class="halo-chat-input">
 <input type="text" id="haloChatInput" placeholder="Ask about your data..." onkeydown="if(event.key==='Enter')sendHaloMsg()">
@@ -210,25 +212,9 @@ tbody td:first-child{font-weight:700;color:var(--teal)}
 <button data-tab="orders">Orders &amp; Service Levels</button>
 <button data-tab="copacking">Co-Packing Performance</button>
 <button data-tab="environment">Environmental Monitoring</button>
-<button data-tab="validation">Data Validation</button>
 <button data-tab="maintenance">Maintenance Guide</button>
 </div>
 
-<!-- UPLOAD MODAL -->
-<div class="modal-overlay" id="uploadModal">
-<div class="modal">
-<button class="close" onclick="this.parentElement.parentElement.classList.remove('show')">&times;</button>
-<h2>Upload Monthly WMS Data</h2>
-<p style="font-size:13px;color:var(--muted);margin-bottom:16px">Upload the monthly source data file exported from Holisol WMS. The dashboard will automatically refresh all views.</p>
-<div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
-<p>Drop your .xlsx file here or click to browse</p>
-<small>Accepts: .xlsx, .xls, .csv</small>
-<input type="file" id="fileInput" accept=".xlsx,.xls,.csv" style="display:none">
-</div>
-<div id="uploadStatus" style="margin-top:12px;font-size:13px;color:var(--teal);display:none"></div>
-<button class="process" id="processBtn" style="display:none" onclick="processUpload()">Process &amp; Refresh Dashboard</button>
-</div>
-</div>
 
 <!-- ========== TAB: KPI ========== -->
 <div class="page" id="page-kpi">
@@ -290,7 +276,7 @@ tbody td:first-child{font-weight:700;color:var(--teal)}
 </div>
 <div class="chart-row">
 <div class="chart-box"><h3>Freight Cost Trend</h3><canvas id="chartKpiFreightTrend"></canvas></div>
-<div class="chart-box"><h3>Shipments by Country (Latest Month)</h3><canvas id="chartKpiCountry"></canvas></div>
+<div class="chart-box"><h3>Shipped Cases by Country (Latest Month)</h3><canvas id="chartKpiCountry"></canvas></div>
 </div>
 </div>
 
@@ -596,20 +582,6 @@ tbody td:first-child{font-weight:700;color:var(--teal)}
 </div>
 </div>
 
-<!-- ========== TAB: DATA VALIDATION ========== -->
-<div class="page" id="page-validation">
-<div class="page-title">Data Validation Protocol</div>
-<div class="page-sub">One-by-one integrity check for every sheet in the Monthly Review Meeting workbook</div>
-
-<div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
-<button id="btnRunValidation" onclick="runValidation()" style="background:var(--teal);color:#fff;border:none;padding:10px 24px;border-radius:6px;font:600 14px Calibri,sans-serif;cursor:pointer">&#9654; Run Full Validation</button>
-<span id="validationStatus" style="font:13px Calibri,sans-serif;color:#888"></span>
-</div>
-
-<div id="validationSummaryCards" class="card-row"></div>
-
-<div id="validationResults" style="margin-top:12px"></div>
-</div>
 
 <!-- ========== TAB: MAINTENANCE GUIDE ========== -->
 <div class="page" id="page-maintenance">
@@ -675,7 +647,7 @@ tbody td:first-child{font-weight:700;color:var(--teal)}
 
 <div class="callout">
 <div class="badge">!</div>
-<div class="text"><strong>Important:</strong> Always back up <code>Monthly Review Meeting.xlsx</code> before making changes. The dashboard reads from <code>_data_block.js</code> (auto-generated by <code>_extract_data.ps1</code>) located in the same directory as this HTML file. Never delete or rename the Excel source file.</div>
+<div class="text"><strong>Important:</strong> Always back up <code>Monthly Review Meeting.xlsx</code> before making changes. The dashboard reads from <code>_data_block.js</code> (auto-generated by the extraction script) located in the same directory as this HTML file. Never delete or rename the Excel source file.</div>
 </div>
 
 <div class="section-divider">Data Source Reference</div>
@@ -721,49 +693,7 @@ tbody td:first-child{font-weight:700;color:var(--teal)}
 let DATA = {};
 let DATA2 = {};
 let allCharts = {};
-
-// Parse an uploaded Excel workbook using SheetJS
-function parseWorkbook(wb) {
-    const get = (name) => {
-        const ws = wb.Sheets[name];
-        if (!ws) return [];
-        return XLSX.utils.sheet_to_json(ws, {defval:''});
-    };
-    return {
-        stockFlow: get('19. Stock Flow'),
-        costingDet: get('14. Costing Details'),
-        costingCases: get('14. Costing Details'),
-        waitingCharges: get('8. Waiting Charges'),
-        weeklyOrders: get('5. Week-wise Orders Details'),
-        damages: get('4. % of Damages'),
-        qualityIssues: get('3. Quality Issues'),
-        manualOrders: get('6. Manual orders'),
-        palletAging: get('13. Mov. Ageing'),
-        copackingWeekly: get('29. COPACKING ORDERS-WEEK WISE'),
-        whDamages: get('12. WH Handling Damages'),
-        inboundFlow: get('16. Inbound Flow-25'),
-        invoiceSummary: get('24. WH Invoice Summary'),
-        tempReport: get('20. Temp report'),
-        subjects: get('1. Subjects'),
-        hubInbound: get('15. Hubwise Inbound Summary'),
-        hubOutbound: get('18. Hubwise Outbound Summary'),
-        storage: get('10. Storage'),
-        copackingOrders: get('28. Co-Packing Orders'),
-        coPacking: get('26. Co-Packing'),
-        customerComplaints: get('27. Customers Complaints'),
-        inboundIssues: get('25. Inbound Issues'),
-        inbGrnMonthly: get('2. Inbound Plan vs GRN'),
-        expiredStock: get('11. Expiry & Near Expire'),
-        freights: get('7. Freights'),
-        outboundCases: get('22. Outbound Summary'),
-        storageHub: get('10. Storage'),
-        truckTurnover: get('9. Truck Turnover Time'),
-        inboundSummary: get('17. Inbound Summary'),
-        inboundDetail: get('21. Inbound Detail'),
-        ytdTrends: get('23. YTD Trends'),
-        fzeSkuGw: get("30. FZE SKU's GW Details")
-    };
-}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 
 // Convert Excel serial number to Mon-YY string (e.g. 44562 -> "Jan-22")
 function excelDateToMonYY(serial) {
@@ -845,7 +775,6 @@ function loadData() {
         DATA2 = { freights: DATA.freights, loadingCapacity: DATA.loadingCapacity || [],
                    outboundCases: DATA.outboundCaseOnly, trucksContainers: DATA.trucksContainers };
     }
-    if (!DATA.stockFlow || DATA.stockFlow.length === 0) generateSampleData();
     fixAllDates();
     normalizeData();
     initDashboard();
@@ -932,8 +861,9 @@ function normalizeData() {
             const key = `${r.Year||''}-${r.Month||''}-${r.SITE||''}`;
             if (!groups[key]) groups[key] = {Year:r.Year, Month:r.Month, SITE:r.SITE, Plan:0, GRN:0};
             const total = num(r.Total) || (num(r.WK1)+num(r.WK2)+num(r.WK3)+num(r.WK4)+num(r.WK5));
-            if ((r.Type||'').toLowerCase().includes('plan')) groups[key].Plan = total;
-            else groups[key].GRN = total;
+            const tp = (r.Type||'').toLowerCase();
+            if (tp.includes('plan')) groups[key].Plan = total;
+            else if (tp.includes('grn')) groups[key].GRN = total;
         });
         const grnNew = Object.values(groups).map(g => ({
             'Month-Year': g.Month ? g.Month.substring(0,3) + '-' + String(g.Year).slice(-2) : '',
@@ -941,198 +871,6 @@ function normalizeData() {
         }));
         DATA.inbGrnMonthly = grnNew;
     }
-}
-
-function generateSampleData() {
-    const months = ['Jan-22','Feb-22','Mar-22','Apr-22','May-22','Jun-22','Jul-22','Aug-22','Sep-22','Oct-22','Nov-22','Dec-22',
-                    'Jan-23','Feb-23','Mar-23','Apr-23','May-23','Jun-23','Jul-23','Aug-23','Sep-23','Oct-23','Nov-23','Dec-23',
-                    'Jan-24','Feb-24','Mar-24','Apr-24','May-24','Jun-24','Jul-24','Aug-24','Sep-24','Oct-24','Nov-24','Dec-24',
-                    'Jan-25','Feb-25','Mar-25','Apr-25','May-25','Jun-25'];
-
-    DATA.stockFlow = months.map((m,i) => ({
-        'Month': m,
-        'Opening Stock': String(150000 + Math.floor(Math.random()*80000)),
-        'Inbound': String(100000 + Math.floor(Math.random()*120000)),
-        'Outbound': String(80000 + Math.floor(Math.random()*100000)),
-        'Closing Stock': String(160000 + Math.floor(Math.random()*100000))
-    }));
-
-    DATA.costingDet = months.slice(0,52).map((m,i) => ({
-        'Month-Year': m,
-        'Inbound Cases': String(100000+Math.floor(Math.random()*100000)),
-        'Outbound Cases': String(60000+Math.floor(Math.random()*80000)),
-        'Storage Cases': String(150000+Math.floor(Math.random()*80000)),
-        'Total Cases': String(350000+Math.floor(Math.random()*100000)),
-        'Pallets In': String(1000+Math.floor(Math.random()*2000)),
-        'Pallets Out': String(500+Math.floor(Math.random()*1500)),
-        'Handling IN': String(8000+Math.floor(Math.random()*12000)),
-        'Handling Out': String(3000+Math.floor(Math.random()*8000)),
-        'Pick & Pack': String(20000+Math.floor(Math.random()*50000)),
-        'Over Time': String(Math.floor(Math.random()*6000)),
-        'Manag. Fees': '1500',
-        'Total price (AED)': String(60000+Math.floor(Math.random()*120000))
-    }));
-
-    DATA.waitingCharges = months.slice(0,48).map(m => ({
-        'Month&Year': m, 'KSA': String(Math.floor(Math.random()*8000)),
-        'OMAN': String(Math.floor(Math.random()*2000)), 'UAE': String(Math.floor(Math.random()*3000)),
-        'Bahrain': String(Math.floor(Math.random()*1000)), 'Kuwait': String(Math.floor(Math.random()*4000)),
-        'Qatar': String(Math.floor(Math.random()*1500)), 'Jordan': String(Math.floor(Math.random()*500)),
-        'Total': String(Math.floor(Math.random()*15000))
-    }));
-
-    DATA.weeklyOrders = [
-        {Month:'Oct-25',Week:'W-1','No of Orders':'55','Order in Cases':'24655','Shipped Cases':'29421'},
-        {Month:'Oct-25',Week:'W-2','No of Orders':'44','Order in Cases':'38004','Shipped Cases':'21571'},
-        {Month:'Oct-25',Week:'W-3','No of Orders':'111','Order in Cases':'48854','Shipped Cases':'10391'},
-        {Month:'Oct-25',Week:'W-4','No of Orders':'89','Order in Cases':'38474','Shipped Cases':'63017'}
-    ];
-
-    DATA.damages = [
-        {Month:'Jan-25','Site Name':'Green Planet Industries LLC','GRN Qty in Cases':'33782','Damaged / Short Units Qty in cases':'18',Percentage:'0.74%'},
-        {Month:'Jan-25','Site Name':'Gulf Centre for Soap','GRN Qty in Cases':'32616','Damaged / Short Units Qty in cases':'1',Percentage:'0.09%'},
-        {Month:'Feb-25','Site Name':'Green Planet Industries LLC','GRN Qty in Cases':'28500','Damaged / Short Units Qty in cases':'12',Percentage:'0.42%'},
-        {Month:'Feb-25','Site Name':'SCITRA','GRN Qty in Cases':'15000','Damaged / Short Units Qty in cases':'3',Percentage:'0.20%'}
-    ];
-
-    DATA.manualOrders = months.slice(12,40).map(m => ({
-        'Month&Year': m, 'Total # Orders': String(200+Math.floor(Math.random()*200)),
-        "API's Order": String(180+Math.floor(Math.random()*150)),
-        'Manual Orders': String(10+Math.floor(Math.random()*60)),
-        '%': (5+Math.random()*15).toFixed(1)+'%'
-    }));
-
-    DATA.palletAging = ['Jun-23','Jul-23','Aug-23','Sep-23','Oct-23','Nov-23','Dec-23','Jan-24','Feb-24','Mar-24','Apr-24','May-24'].map(m => ({
-        'Month': m,
-        'No of Days between 0 to 30': String(800+Math.floor(Math.random()*600)),
-        'No of Days between 31 to 60': String(300+Math.floor(Math.random()*300)),
-        'No of Days between 61 to 90': String(100+Math.floor(Math.random()*200)),
-        'No of Days between 91 to 120': String(50+Math.floor(Math.random()*100)),
-        'No of Days between 121 to 150': String(30+Math.floor(Math.random()*60)),
-        'No of Days between 151 to 180': String(10+Math.floor(Math.random()*40)),
-        'No of Days between 181 to 210': String(5+Math.floor(Math.random()*30)),
-        'No of Days between 211 to 552': String(10+Math.floor(Math.random()*50))
-    }));
-
-    DATA.inboundFlow = [];
-    ['Jan-23','Feb-23','Mar-23','Apr-23','May-23','Jun-23'].forEach(m => {
-        [1,2,3,4].forEach(w => {
-            DATA.inboundFlow.push({Month:m,'Week No.':String(w),Cases:String(5000+Math.floor(Math.random()*25000)),Pallets:String(50+Math.floor(Math.random()*500))});
-        });
-    });
-
-    DATA.tempReport = [];
-    for(let d=1;d<=31;d++){
-        const max=24+Math.random()*5, min=22+Math.random()*3;
-        DATA.tempReport.push({Date:`${d}-1-2025`,'Max. temperature':max.toFixed(1),'Min. temperature':min.toFixed(1),Average:((max+min)/2).toFixed(2)});
-    }
-
-    DATA.subjects = [
-        {MonthYear:'Aug-24',Description:'One CDA should be as per Equipment & Market','Responsible Person':'Behzad / Priyesh',Status:'Open',Action:'TLB Master Implementation'},
-        {MonthYear:'Aug-24',Description:'Trucks Tracking System','Responsible Person':'Behzad / Priyesh',Status:'Open',Action:'Integration pending'},
-        {MonthYear:'Aug-24',Description:'Automated Reconciliation Process','Responsible Person':'Priyesh / Behzad',Status:'Open',Action:'Under Development'}
-    ];
-
-    DATA.qualityIssues = [
-        {Month:'Aug-25',Issues:'Damage cartons',SKU:'18000995','Vendor Name':'Green Planet Industries LLC',Description:'ANTI DAND. SHAMPOO 400ML',Cases:'1',Status:''},
-        {Month:'Aug-25',Issues:'Damage cartons',SKU:'18001869','Vendor Name':'Green Planet Industries LLC',Description:'ANTI HAIR FALL SHAMPOO 400ML',Cases:'1',Status:''},
-        {Month:'Aug-25',Issues:'Shortage',SKU:'18002533','Vendor Name':'Green Planet Industries LLC',Description:'NOURISHING SKIN CREAM 250ML',Cases:'1',Status:''}
-    ];
-
-    DATA.whDamages = [
-        {Month:'Jan-25',Description:'INT MOISTURISING CREAM 150MLX2','Total Quantity':'2',Vendor:'GPI',Remarks:'WH - Handling Damage'},
-        {Month:'Jan-25',Description:'BLACKHEAD CLRNG WALNUT F WASH 150ML','Total Quantity':'1',Vendor:'GPI',Remarks:'WH - Handling Damage'}
-    ];
-
-    DATA.customerComplaints = [
-        {Date:'11-02-2022','Customer Name':'Alphamed','Description':'GENTLE BABY BATH 400 ML','DO Qty':'9','Physical Rec Qty':'0',Differents:'-9','Complaint Type':'Item Interchange',Staus:'Closed'},
-        {Date:'02-03-2022','Customer Name':'Jeddah','Description':'Softness & Shine Shampoo','DO Qty':'125','Physical Rec Qty':'122',Differents:'-3','Complaint Type':'Shortage',Staus:'Closed'}
-    ];
-
-    DATA.overtime = [
-        {' Date ':'29-11-2025',' Hrs ':'10',' Amount ':'1750',' Activity ':'Outbound'},
-        {' Date ':'17-11-2025',' Hrs ':'4',' Amount ':'700',' Activity ':'Inbound/Outbound'},
-        {' Date ':'30-11-2025',' Hrs ':'10',' Amount ':'1750',' Activity ':'Inbound/Outbound'}
-    ];
-
-    DATA.invoiceSummary = [
-        {Month:'Jan-25','DESCRIPTION OF GOODS / SERVICES':'Warehouse Storage Charges','GCC & NA':'81248',Turkey:'8102','South Africa':'21549','Russia FZCO':'19770'},
-        {Month:'Jan-25','DESCRIPTION OF GOODS / SERVICES':'Warehouse Handling In Charges','GCC & NA':'5142',Turkey:'90','South Africa':'312','Russia FZCO':'264'}
-    ];
-
-    DATA.copackingWeekly = [
-        {Month:'Sep-25',Week:'W-1','No.of Orders':'0','No.of Cases':'0'},
-        {Month:'Sep-25',Week:'W-2','No.of Orders':'3','No.of Cases':'2426'},
-        {Month:'Sep-25',Week:'W-3','No.of Orders':'19','No.of Cases':'7750'},
-        {Month:'Sep-25',Week:'W-4','No.of Orders':'15','No.of Cases':'3261'}
-    ];
-
-    DATA.hubInbound = [
-        {'Vendor Name':'Green Planet Industries LLC',Hub:'GCC & NA',Pallets:'197',Cases:'16613',Date:'Jan-23'},
-        {'Vendor Name':'Beauty and Perfume International',Hub:'GCC & NA',Pallets:'18',Cases:'1870',Date:'Jan-23'},
-        {'Vendor Name':'Gulf Centre for Soap',Hub:'GCC & NA',Pallets:'130',Cases:'12174',Date:'Jan-23'},
-        {'Vendor Name':'SCITRA',Hub:'GCC & NA',Pallets:'80',Cases:'5297',Date:'Jan-23'}
-    ];
-
-    DATA.copackingOrders = [
-        {Month:'Sep-25','Client Order No':'CDA0207668','Customer Name':'Himalaya Co Packer','SKU No':'18000386',Description:'MOIST. BABY SOAP WITH ALOE 125GM',Cases:'115',Remarks:'Below 150 Cases'},
-        {Month:'Sep-25','Client Order No':'CDA0206604','Customer Name':'Himalaya Co Packer','SKU No':'18000701',Description:'OLIVE EXTRA NOURISHING CREAM 150ML',Cases:'15',Remarks:'Below 150 Cases'}
-    ];
-
-    DATA.coPacking = [
-        {'Month Name':'Jan-24','Short Text':'SMOOTH & SILKY MOIST SHAMPOO 400ML','Production Qty (Cases)':'200','Total Amount':'276.00',Remarks:'SHRINK'},
-        {'Month Name':'Jan-24','Short Text':'VOL. & THICKNESS SHAM 400ML','Production Qty (Cases)':'583','Total Amount':'804.54',Remarks:'SHRINK'}
-    ];
-
-    DATA.inbGrnMonthly = [
-        {Year:'2024','Month-Year':'Jan-24',Week:'WK1','GRN Cases':'6506','Planned cases':'20279','Percentage (GRN)':'8%'},
-        {Year:'2024','Month-Year':'Jan-24',Week:'WK2','GRN Cases':'22079','Planned cases':'31578','Percentage (GRN)':'26%'},
-        {Year:'2024','Month-Year':'Jan-24',Week:'WK3','GRN Cases':'8763','Planned cases':'54847','Percentage (GRN)':'10%'},
-        {Year:'2024','Month-Year':'Jan-24',Week:'WK4','GRN Cases':'15555','Planned cases':'101225','Percentage (GRN)':'18%'}
-    ];
-
-    DATA.expiredStock = [
-        {No:'18001008',Description:'PURIFYING NEEM SCRUB 150ML','MFD Date':'1-1-2021','Expiry Date':'30-12-2023','Pack Size':'24','Sum of Total Quantity':'1','Month Name':'Jan-24'},
-        {No:'18001513',Description:'INT MOIST COC. BUT. LIPBALM 4.5g','MFD Date':'5-1-2021','Expiry Date':'5-1-2024','Pack Size':'24','Sum of Total Quantity':'58','Month Name':'Jan-24'}
-    ];
-
-    DATA.inboundIssues = [
-        {Date:'19-02-2022','Vendor Name':'SCITRA','ASN No':'ASN/96','Description':'SPARKLY WHITE TOOTHPASTE','ASN Qty':'230','Physical Rec Qty':'60',Differents:'-170',Remarks:'ASN Qty mismatch',Status:'Closed'}
-    ];
-
-    DATA.hubOutbound = [
-        {'Row Labels':'Alphamed General Trading LLC','Month Name':'Jul-24','GCC & NA':'27796',LATVIA:'111','SA & E AFRICA':'51'},
-        {'Row Labels':'Arabian Trading Supplies','Month Name':'Jul-24','GCC & NA':'18699',LATVIA:'700','SA & E AFRICA':'100'}
-    ];
-
-    DATA.storeDet = months.slice(0,48).map((m,i) => ({
-        Year: m.split('-')[1] < '23' ? '2022' : (m.split('-')[1] < '24' ? '2023' : '2024'),
-        Month: m.split('-')[0],
-        SEA: String(200+Math.floor(Math.random()*6000)),
-        LATVIA: String(500+Math.floor(Math.random()*28000)),
-        HUSA: String(Math.floor(Math.random()*600)),
-        METAP: String(20000+Math.floor(Math.random()*90000)),
-        TURKEY: String(Math.floor(Math.random()*15000)),
-        EUROPE: String(Math.floor(Math.random()*5000))
-    }));
-
-    DATA2 = DATA2 || {};
-    DATA2.freights = [
-        {'Total Cases':'12070','Total Trucks':'18','Total Freight':'8090','Total Pallets':'190',Country:'UAE',Month:'Jan-21','Shipment Type':'Road',Equipment:'13.5 MTR Box Truck','Pallet Load Ability %':'41%','Cases Load Ability %':'43%','Freight Per Case':'0.67'},
-        {'Total Cases':'3320','Total Trucks':'2','Total Freight':'2900','Total Pallets':'50',Country:'Oman',Month:'Jan-21','Shipment Type':'Road',Equipment:'Trailer 12.5 MTR','Pallet Load Ability %':'104%','Cases Load Ability %':'115%','Freight Per Case':'0.87'},
-        {'Total Cases':'2392','Total Trucks':'1','Total Freight':'3300','Total Pallets':'25',Country:'KSA',Month:'Jan-21','Shipment Type':'Road',Equipment:'13.5 MTR Reefer Truck','Pallet Load Ability %':'96%','Cases Load Ability %':'153%','Freight Per Case':'1.38'}
-    ];
-
-    DATA2.outboundCases = [
-        {Year:'2022','Site ':'Alphamed General Trading LLC',January:'11465',February:'23937',March:'27889',Total:'328497','%':'18.39%'},
-        {Year:'2022','Site ':'Transatlantic Almaty LTD',January:'0',February:'0',March:'0',Total:'256468','%':'14.36%'},
-        {Year:'2022','Site ':'Arabian Trading Supplies – Riyadh',January:'8626',February:'8443',March:'13204',Total:'141887','%':'7.94%'}
-    ];
-
-    DATA2.trucksContainers = [
-        {Year:'2022','Site ':'Alphamed General Trading LLC',January:'11',February:'22',March:'18',Total:'231','%':'20.55%'},
-        {Year:'2022','Site ':'Arabian Trading Supplies – Riyadh',January:'6',February:'6',March:'8',Total:'91','%':'8.10%'}
-    ];
 }
 
 // ==================== UTILITIES ====================
@@ -1188,10 +926,10 @@ function makeChart(id, config) {
 function makeCard(label, value, sub, trend, cls) {
     const trendCls = trend > 0 ? 'up' : (trend < 0 ? 'down' : '');
     const trendTxt = trend > 0 ? `&#9650; ${trend}%` : (trend < 0 ? `&#9660; ${Math.abs(trend)}%` : '');
-    return `<div class="card ${cls||''}" onclick="drillDown('${label}')">
-        <div class="card-label">${label}</div>
+    return `<div class="card ${esc(cls||'')}" onclick="drillDown('${esc(label).replace(/'/g,'\\&#39;')}')">
+        <div class="card-label">${esc(label)}</div>
         <div class="card-value">${value}</div>
-        <div class="card-sub">${sub||''}</div>
+        <div class="card-sub">${esc(sub||'')}</div>
         ${trendTxt ? `<div class="card-trend ${trendCls}">${trendTxt}</div>` : ''}
     </div>`;
 }
@@ -1235,7 +973,6 @@ function renderTab(tabId) {
         orders: renderOrders,
         copacking: renderCoPacking,
         environment: renderEnvironment,
-        validation: renderValidation
     };
     if (map[tabId]) map[tabId]();
 }
@@ -1264,31 +1001,6 @@ function populateExecRegion() {
     if (prev !== 'all' && sorted.includes(prev)) sel.value = prev;
 }
 
-function autoSelectLatestMonth() {
-    // Find latest month from stockFlow that has actual Inbound/Outbound data
-    // stockFlow drives the executive view, so it's the primary reference
-    const MONTH_ORDER = {Jan:1,Feb:2,Mar:3,Apr:4,May:5,Jun:6,Jul:7,Aug:8,Sep:9,Oct:10,Nov:11,Dec:12};
-    let bestYear = 0, bestMonIdx = 0, bestMon = '';
-
-    (DATA.stockFlow||[]).forEach(r => {
-        if (!r.Month) return;
-        // Only rows with actual numeric data
-        if (!(num(r.Inbound) > 0 || num(r.Outbound) > 0 || num(r['Closing Stock']) > 0)) return;
-        const m = String(r.Month).match(/^([A-Z][a-z]{2})-(\d{2})$/);
-        if (!m) return;
-        const yr = 2000 + parseInt(m[2]);
-        const mi = MONTH_ORDER[m[1]] || 0;
-        if (yr > bestYear || (yr === bestYear && mi > bestMonIdx)) {
-            bestYear = yr; bestMonIdx = mi; bestMon = m[1];
-        }
-    });
-
-    if (bestMon && bestYear) {
-        document.getElementById('globalMonth').value = bestMon;
-        document.getElementById('globalYear').value = String(bestYear);
-    }
-}
-
 function populateFilters() {
     const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     // Collect all years from all datasets that have month-based date fields
@@ -1315,8 +1027,6 @@ function populateFilters() {
     MONTH_NAMES.forEach(m => { const o = document.createElement('option'); o.value = m; o.text = m; gm.appendChild(o); });
     years.forEach(y => { const o = document.createElement('option'); o.value = y; o.text = y; gy.appendChild(o); });
 
-    const wy = document.getElementById('whYear');
-    if (wy) { wy.innerHTML = '<option value="all">All</option>'; years.forEach(y => { const o = document.createElement('option'); o.value = y; o.text = y; wy.appendChild(o); }); }
 }
 
 // Global filter: returns a filter function that checks Mon-YY date fields
@@ -1342,8 +1052,17 @@ function getGlobalFilter() {
             // Just month name like "January" - match abbreviated
             mon = s.substring(0,3); yr = null;
         } else if (/^\d{4}$/.test(s)) {
-            // Just year
-            mon = null; yr = s;
+            // Just year — skip month check since this column has no month info
+            yr = s;
+            if (y !== 'all' && yr !== y) return false;
+            return true;
+        } else if (/^\d{5}$/.test(s)) {
+            // Excel serial date (e.g. 46174 = 2026-06-01)
+            const dt = new Date(new Date(1899,11,30).getTime() + parseInt(s)*86400000);
+            if (!isNaN(dt)) {
+                const moAbbrs = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                mon = moAbbrs[dt.getMonth()]; yr = String(dt.getFullYear());
+            } else { return true; }
         } else {
             return true;
         }
@@ -1378,6 +1097,14 @@ function resetGlobalFilter() {
     document.getElementById('globalMonth').value = 'all';
     document.getElementById('globalYear').value = 'all';
     applyGlobalFilter();
+}
+
+// For pivot-table datasets with month columns: returns the selected month's column name, or 'Total' if all months
+function getPivotMonthCol() {
+    const m = document.getElementById('globalMonth').value;
+    if (m === 'all') return 'Total';
+    const map = {Jan:'January',Feb:'February',Mar:'March',Apr:'April',May:'May',Jun:'June',Jul:'July',Aug:'August',Sep:'September',Oct:'October',Nov:'November',Dec:'December'};
+    return map[m] || 'Total';
 }
 
 // Apply global month/year filter to an array given its date key
@@ -1593,7 +1320,7 @@ function renderKPI() {
     if (kpiCharts.country) kpiCharts.country.destroy();
     kpiCharts.country = new Chart(document.getElementById('chartKpiCountry'), {
         type:'bar', data:{labels:cLabels, datasets:[{label:'Cases', data:cLabels.map(l=>countryMap[l]), backgroundColor:cColors}]},
-        options:{responsive:true, indexAxis:'y', scales:{x:{ticks:{callback:v=>fmt(v)}}}}
+        options:{responsive:true, indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{ticks:{callback:v=>fmt(v)}}}}
     });
 }
 
@@ -1734,7 +1461,7 @@ function renderExecutive() {
     const tbody = document.querySelector('#tblSubjects tbody');
     gf(DATA.subjects||[], 'MonthYear').slice(0,20).forEach(r => {
         const statusPill = r.Status === 'Closed' ? '<span class="pill green">Closed</span>' : '<span class="pill orange">Open</span>';
-        tbody.innerHTML += `<tr><td>${r.MonthYear||''}</td><td>${r.Description||''}</td><td>${r['Responsible Person']||''}</td><td>${statusPill}</td><td>${r.Action||''}</td></tr>`;
+        tbody.innerHTML += `<tr><td>${esc(r.MonthYear)}</td><td>${esc(r.Description)}</td><td>${esc(r['Responsible Person'])}</td><td>${statusPill}</td><td>${esc(r.Action)}</td></tr>`;
     });
 }
 
@@ -1920,11 +1647,12 @@ function renderWarehouse() {
 
     // Inbound Summary by Site
     const inbSumm = gf(DATA.inboundSummary || [], 'Year');
+    const pivotCol = getPivotMonthCol();
     const siteAgg = {};
     inbSumm.filter(r => (r.Type||'').toLowerCase() === 'cases').forEach(r => {
         const site = (r['Site ']||r.Site||'').substring(0,30);
         if (!site) return;
-        const total = num(r.Total);
+        const total = num(r[pivotCol]);
         siteAgg[site] = (siteAgg[site]||0) + total;
     });
     const siteSorted = Object.entries(siteAgg).filter(e=>e[1]>0).sort((a,b)=>b[1]-a[1]).slice(0,10);
@@ -1952,13 +1680,17 @@ function renderWarehouse() {
     const tLeg = document.getElementById('treemapLegend');
     if (tLeg) tLeg.innerHTML = '';
 
-    // Avg Truck Turnover by Month
+    // Avg Truck Turnover by Month — parse HH:MM:SS properly
     const monthTO = {};
     const monthOrder = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     ttFiltered.forEach(r => {
-        const t = parseFloat(r['Turnover Time']);
-        if (isNaN(t) || t <= 0) return;
-        const mins = t * 24 * 60;
+        const raw = String(r['Turnover Time']||'').trim();
+        if (!raw) return;
+        let mins;
+        const tp = raw.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+        if (tp) { mins = (+tp[1])*60 + (+tp[2]) + (+tp[3]||0)/60; }
+        else { const t = parseFloat(raw); if (isNaN(t) || t <= 0) return; mins = t * 24 * 60; }
+        if (mins <= 0) return;
         let m = (r.Month||'').substring(0,3);
         if (/^\d+$/.test(r.Month)) return;
         if (!m) return;
@@ -1976,15 +1708,23 @@ function renderWarehouse() {
     // Inbound Issues Table
     const iitb = document.querySelector('#tblInbIssues tbody');
     issuesFiltered.slice(0,30).forEach(r => {
-        iitb.innerHTML += `<tr><td>${r.Date||''}</td><td>${r['Vendor Name']||''}</td><td>${r['ASN No']||''}</td><td>${(r.Description||'').substring(0,40)}</td><td>${r['ASN Qty']||''}</td><td>${r['Physical Rec Qty']||''}</td><td>${r.Differents||''}</td><td>${(r.Remarks||'').substring(0,50)}</td><td><span class="pill ${(r.Status||'').includes('Close')?'green':'orange'}">${r.Status||''}</span></td></tr>`;
+        iitb.innerHTML += `<tr><td>${esc(r.Date)}</td><td>${esc(r['Vendor Name'])}</td><td>${esc(r['ASN No'])}</td><td>${esc((r.Description||'').substring(0,40))}</td><td>${esc(r['ASN Qty'])}</td><td>${esc(r['Physical Rec Qty'])}</td><td>${esc(r.Differents)}</td><td>${esc((r.Remarks||'').substring(0,50))}</td><td><span class="pill ${(r.Status||'').includes('Close')?'green':'orange'}">${esc(r.Status)}</span></td></tr>`;
     });
 
     // Inbound Detail Table (recent GRNs)
     const idTb = document.querySelector('#tblInbDetail tbody');
-    const inbDetRaw = gf(DATA.inboundDetail || [], 'Year');
+    let inbDetRaw = gf(DATA.inboundDetail || [], 'Year');
+    const selMon = document.getElementById('globalMonth').value;
+    if (selMon !== 'all') {
+        const monNum = {Jan:1,Feb:2,Mar:3,Apr:4,May:5,Jun:6,Jul:7,Aug:8,Sep:9,Oct:10,Nov:11,Dec:12}[selMon];
+        if (monNum) inbDetRaw = inbDetRaw.filter(r => {
+            const d = (r['Created At']||''); const p = d.match(/(\d{1,2})-(\d{1,2})-(\d{4})/);
+            return p && parseInt(p[2]) === monNum;
+        });
+    }
     const inbDet = vendor !== 'all' ? inbDetRaw.filter(r => matchVendor(r['Vendor Name'], vendor)) : inbDetRaw;
     inbDet.slice(-50).reverse().forEach(r => {
-        idTb.innerHTML += `<tr><td>${r.Client||''}</td><td>${r['GRN No']||''}</td><td>${(r['Vendor Name']||'').substring(0,25)}</td><td>${(r.Description||'').substring(0,35)}</td><td>${r['SKU No 2']||''}</td><td>${r['Quantity in Cases']||''}</td><td>${r['Created At']||''}</td></tr>`;
+        idTb.innerHTML += `<tr><td>${esc(r.Client)}</td><td>${esc(r['GRN No'])}</td><td>${esc((r['Vendor Name']||'').substring(0,25))}</td><td>${esc((r.Description||'').substring(0,35))}</td><td>${esc(r['SKU No 2'])}</td><td>${esc(r['Quantity in Cases'])}</td><td>${esc(r['Created At'])}</td></tr>`;
     });
 }
 
@@ -2144,7 +1884,8 @@ function renderInventory() {
             _h:'400px'
         });
     } else {
-        makeChart('chartStorageBand', {type:'pie',data:{labels:['1000-2000','2001-2500','2501-3000','3001-3500','3501-4000'],datasets:[{data:[5,22,24,13,4],backgroundColor:COLORS.set}]}});
+        const noDataEl = document.getElementById('chartStorageBand').parentElement;
+        noDataEl.insertAdjacentHTML('beforeend','<p style="text-align:center;color:#999;margin-top:60px">No storage data for selected period</p>');
     }
 
     // Stock Movement
@@ -2182,7 +1923,7 @@ function renderInventory() {
             const mfdDate = typeof mfd === 'number' || /^\d+$/.test(mfd) ? new Date((parseInt(mfd) - 25569) * 86400000) : new Date(mfd);
             if (!isNaN(mfdDate)) { agingStr = Math.floor((Date.now() - mfdDate) / 86400000) + 'd'; }
         }
-        exTb.innerHTML += `<tr><td>${r.No||''}</td><td>${(r.Description||'').substring(0,45)}</td><td>${r['MFD Date']||''}</td><td>${r['Expiry Date']||''}</td><td>${r['Pack Size']||''}</td><td>${r['Sum of Total Quantity']||''}</td><td style="${shelfClass}">${shelfStr}</td><td>${agingStr}</td><td>${r['Month Name']||''}</td></tr>`;
+        exTb.innerHTML += `<tr><td>${esc(r.No)}</td><td>${esc((r.Description||'').substring(0,45))}</td><td>${esc(r['MFD Date'])}</td><td>${esc(r['Expiry Date'])}</td><td>${esc(r['Pack Size'])}</td><td>${esc(r['Sum of Total Quantity'])}</td><td style="${shelfClass}">${shelfStr}</td><td>${agingStr}</td><td>${esc(r['Month Name'])}</td></tr>`;
     });
 
     // Aging Analysis (filtered by global month/year)
@@ -2359,20 +2100,20 @@ function renderQuality() {
     // WH Damages Table
     const wdTb = document.querySelector('#tblWhDamages tbody');
     wdF.slice(0,30).forEach(r => {
-        wdTb.innerHTML += `<tr><td>${r.Month||''}</td><td>${r['SKU No']||r.No||''}</td><td>${(r.Description||'').substring(0,40)}</td><td>${r['Total Quantity']||''}</td><td>${r['Expiry Date']||''}</td><td>${r.Remarks||r['Hold Remarks']||''}</td><td>${r.Vendor||''}</td></tr>`;
+        wdTb.innerHTML += `<tr><td>${esc(r.Month)}</td><td>${esc(r['SKU No']||r.No)}</td><td>${esc((r.Description||'').substring(0,40))}</td><td>${esc(r['Total Quantity'])}</td><td>${esc(r['Expiry Date'])}</td><td>${esc(r.Remarks||r['Hold Remarks'])}</td><td>${esc(r.Vendor)}</td></tr>`;
     });
 
     // Complaints Table
     const ccTb = document.querySelector('#tblComplaints tbody');
     cc.slice(0,30).forEach(r => {
         const st = (r.Staus||r.Status||'');
-        ccTb.innerHTML += `<tr><td>${r.Date||''}</td><td>${r['Customer Name']||''}</td><td>${(r.Description||'').substring(0,35)}</td><td>${r['DO Qty']||''}</td><td>${r['Physical Rec Qty']||''}</td><td>${r.Differents||''}</td><td>${r['Complaint Type']||''}</td><td><span class="pill ${st.includes('Close')?'green':'orange'}">${st}</span></td></tr>`;
+        ccTb.innerHTML += `<tr><td>${esc(r.Date)}</td><td>${esc(r['Customer Name'])}</td><td>${esc((r.Description||'').substring(0,35))}</td><td>${esc(r['DO Qty'])}</td><td>${esc(r['Physical Rec Qty'])}</td><td>${esc(r.Differents)}</td><td>${esc(r['Complaint Type'])}</td><td><span class="pill ${st.includes('Close')?'green':'orange'}">${esc(st)}</span></td></tr>`;
     });
 
     // FZE SKU Gross Weight Table
     const fzeTb = document.querySelector('#tblFzeGw tbody');
     gf(DATA.fzeSkuGw || [], 'Year - Month').forEach(r => {
-        fzeTb.innerHTML += `<tr><td>${r['Year - Month']||''}</td><td>${r['SR. No']||''}</td><td>${r['Item Code']||''}</td><td>${(r.Description||'').substring(0,45)}</td><td>${r['GW - Box-1']||''}</td><td>${r['GW - Box-2']||''}</td><td>${r['GW - Box-3']||''}</td><td>${r['GW - Box-4']||''}</td><td>${r['GW - Box-5']||''}</td></tr>`;
+        fzeTb.innerHTML += `<tr><td>${esc(r['Year - Month'])}</td><td>${esc(r['SR. No'])}</td><td>${esc(r['Item Code'])}</td><td>${esc((r.Description||'').substring(0,45))}</td><td>${esc(r['GW - Box-1'])}</td><td>${esc(r['GW - Box-2'])}</td><td>${esc(r['GW - Box-3'])}</td><td>${esc(r['GW - Box-4'])}</td><td>${esc(r['GW - Box-5'])}</td></tr>`;
     });
 }
 
@@ -2540,7 +2281,8 @@ function renderFreight() {
     const totalCases = sumArr(fr, 'Total Cases');
     const totalTrucks = sumArr(fr, 'Total Trucks');
     const totalFreight = sumArr(fr, 'Total Freight');
-    const avgLoadPct = fr.length ? (fr.reduce((s,r)=>s+num(r['Pallet Load Ability %'])*100,0)/fr.filter(r=>num(r['Pallet Load Ability %'])>0).length).toFixed(0) : 0;
+    const loadRows = fr.filter(r=>num(r['Pallet Load Ability %'])>0);
+    const avgLoadPct = loadRows.length ? (loadRows.reduce((s,r)=>s+num(r['Pallet Load Ability %'])*100,0)/loadRows.length).toFixed(0) : 0;
 
     document.getElementById('freightCards').innerHTML =
         makeCard('Total Cases Shipped', fmt(totalCases), 'All time') +
@@ -2629,18 +2371,45 @@ function renderFreight() {
         options:{plugins:{legend:{display:false}},scales:{y:{title:{display:true,text:'AED'}}}}
     });
 
-    // Truck Turnover Analysis — Turnover Time is decimal fraction of a day
-    const ttAll = gf(DATA.truckTurnover || [], 'Month');
+    // Truck Turnover Analysis — filter by Physical Received Date (Excel serial), parse HH:MM:SS
+    const ttRaw = DATA.truckTurnover || [];
+    const ttFiltM = document.getElementById('globalMonth').value;
+    const ttFiltY = document.getElementById('globalYear').value;
+    const EXCEL_EPOCH = new Date(1899, 11, 30);
+    const moOrder = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const moAbbrToFull = {jan:'January',feb:'February',mar:'March',apr:'April',may:'May',jun:'June',jul:'July',aug:'August',sep:'September',oct:'October',nov:'November',dec:'December'};
+    function ttParseTime(v) {
+        const s = String(v||'').trim();
+        const m = s.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+        return m ? (+m[1])*60 + (+m[2]) + (+m[3]||0)/60 : null;
+    }
+    function ttRowMonth(r) {
+        const raw = (r.Month||'').trim();
+        if (!raw) return '';
+        const lower = raw.toLowerCase();
+        if (moAbbrToFull[lower.substring(0,3)]) return moAbbrToFull[lower.substring(0,3)];
+        const serial = parseInt(raw);
+        if (!isNaN(serial) && serial > 40000) { const dt = new Date(EXCEL_EPOCH.getTime() + serial*86400000); return moOrder[dt.getMonth()]||''; }
+        return '';
+    }
+    function ttRowYear(r) {
+        const prd = parseInt(r['Physical Received Date']);
+        if (!isNaN(prd) && prd > 40000) { return String(new Date(EXCEL_EPOCH.getTime() + prd*86400000).getFullYear()); }
+        return '';
+    }
+    const ttAll = ttRaw.filter(r => {
+        if (ttFiltY !== 'all') { const ry = ttRowYear(r); if (ry && ry !== ttFiltY) return false; }
+        if (ttFiltM !== 'all') { const rm = ttRowMonth(r); const selFull = moAbbrToFull[ttFiltM.toLowerCase().substring(0,3)]||''; if (rm && rm !== selFull) return false; }
+        return true;
+    });
     const monthTO = {};
     ttAll.forEach(r => {
-        const m = r.Month || '';
-        const t = parseFloat(r['Turnover Time']);
-        if (isNaN(t) || t <= 0 || !m) return;
-        const mins = t * 24 * 60;
+        const m = ttRowMonth(r);
+        const mins = ttParseTime(r['Turnover Time']);
+        if (mins === null || mins <= 0 || !m) return;
         if (!monthTO[m]) monthTO[m] = [];
         monthTO[m].push(mins);
     });
-    const moOrder = ['January','February','March','April','May','June','July','August','September','October','November','December'];
     const toMonths = moOrder.filter(m => monthTO[m]);
     makeChart('chartTurnoverMonth', {
         type: 'line',
@@ -2652,18 +2421,18 @@ function renderFreight() {
     });
     const siteTO2 = {};
     ttAll.forEach(r => {
-        const site = (r.Site||'').substring(0,25);
-        const t = parseFloat(r['Turnover Time']);
-        if (isNaN(t) || t <= 0 || !site) return;
-        const mins = t * 24 * 60;
-        if (!siteTO2[site]) siteTO2[site] = [];
-        siteTO2[site].push(mins);
+        const site = (r.Site||'').trim();
+        const siteLbl = site.length > 30 ? site.substring(0,27)+'...' : site;
+        const mins = ttParseTime(r['Turnover Time']);
+        if (mins === null || mins <= 0 || !site) return;
+        if (!siteTO2[siteLbl]) siteTO2[siteLbl] = {sum:0,cnt:0,full:site};
+        siteTO2[siteLbl].sum += mins; siteTO2[siteLbl].cnt++;
     });
-    const toSites2 = Object.entries(siteTO2).map(([s,arr])=>([s,(arr.reduce((a,b)=>a+b,0)/arr.length).toFixed(0)])).sort((a,b)=>b[1]-a[1]);
+    const toSites2 = Object.entries(siteTO2).map(([s,o])=>([s,(o.sum/o.cnt).toFixed(0),o.full])).sort((a,b)=>b[1]-a[1]).slice(0,15);
     makeChart('chartTurnoverSite', {
         type: 'bar',
         data: { labels: toSites2.map(s=>s[0]), datasets: [{label:'Avg Minutes',data:toSites2.map(s=>Number(s[1])),backgroundColor:COLORS.set}] },
-        options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{title:{display:true,text:'Minutes'}}}}
+        options:{indexAxis:'y',plugins:{legend:{display:false},tooltip:{callbacks:{title:t=>toSites2[t[0].dataIndex][2]}}},scales:{x:{title:{display:true,text:'Minutes'}}}}
     });
 
     // Waiting Charges Table
@@ -2771,28 +2540,32 @@ function renderOrders() {
 
     // Outbound by Customer
     const custCases = {};
-    oc.forEach(r => { const s = (r['Site ']||r.Site||'').substring(0,25); custCases[s] = (custCases[s]||0) + num(r.Total); });
+    const ocPivot = getPivotMonthCol();
+    oc.forEach(r => { const s = (r['Site ']||r.Site||'').trim(); if(s) custCases[s] = (custCases[s]||0) + num(r[ocPivot]); });
     const ccSorted = Object.entries(custCases).filter(e=>e[1]>0).sort((a,b)=>b[1]-a[1]).slice(0,10);
+    const ccLabels = ccSorted.map(c => c[0].length > 35 ? c[0].substring(0,32)+'...' : c[0]);
     makeChart('chartOutbCust', {
         type: 'bar',
-        data: { labels: ccSorted.map(c=>c[0]), datasets: [{label:'Cases',data:ccSorted.map(c=>c[1]),backgroundColor:COLORS.set}] },
-        options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{ticks:{callback:v=>fmt(v)}}}}
+        data: { labels: ccLabels, datasets: [{label:'Cases',data:ccSorted.map(c=>c[1]),backgroundColor:COLORS.set}] },
+        options:{indexAxis:'y',plugins:{legend:{display:false},tooltip:{callbacks:{title:t=>ccSorted[t[0].dataIndex][0]}}},scales:{x:{ticks:{callback:v=>fmt(v)}}}}
     });
 
     // Trucks by Customer
     const custTrucks = {};
-    tc.forEach(r => { const s = (r['Site ']||r.Site||'').substring(0,25); custTrucks[s] = (custTrucks[s]||0) + num(r.Total); });
+    const tcPivot = getPivotMonthCol();
+    tc.forEach(r => { const s = (r['Site ']||r.Site||'').trim(); if(s) custTrucks[s] = (custTrucks[s]||0) + num(r[tcPivot]); });
     const ctSorted = Object.entries(custTrucks).filter(e=>e[1]>0).sort((a,b)=>b[1]-a[1]).slice(0,10);
+    const ctLabels = ctSorted.map(c => c[0].length > 35 ? c[0].substring(0,32)+'...' : c[0]);
     makeChart('chartTrucksCust', {
         type: 'bar',
-        data: { labels: ctSorted.map(c=>c[0]), datasets: [{label:'Trucks',data:ctSorted.map(c=>c[1]),backgroundColor:COLORS.set}] },
-        options:{indexAxis:'y',plugins:{legend:{display:false}}}
+        data: { labels: ctLabels, datasets: [{label:'Trucks',data:ctSorted.map(c=>c[1]),backgroundColor:COLORS.set}] },
+        options:{indexAxis:'y',plugins:{legend:{display:false},tooltip:{callbacks:{title:t=>ctSorted[t[0].dataIndex][0]}}}}
     });
 
     // Hub Outbound Table
     const hoTb = document.querySelector('#tblHubOutbound tbody');
     ho.slice(0,30).forEach(r => {
-        hoTb.innerHTML += `<tr><td>${r.Customer||r['Row Labels']||''}</td><td>${r['Month Name']||''}</td><td>${fmtN(num(r['GCC & NA']))}</td><td>${fmtN(num(r.LATVIA))}</td><td>${fmtN(num(r['SA & E AFRICA']))}</td><td>${fmtN(num(r.HUSA))}</td><td>${fmtN(num(r.EUROPE))}</td><td>${fmtN(num(r.RUSSIA))}</td></tr>`;
+        hoTb.innerHTML += `<tr><td>${esc(r.Customer||r['Row Labels'])}</td><td>${esc(r['Month Name'])}</td><td>${fmtN(num(r['GCC & NA']))}</td><td>${fmtN(num(r.LATVIA))}</td><td>${fmtN(num(r['SA & E AFRICA']))}</td><td>${fmtN(num(r.HUSA))}</td><td>${fmtN(num(r.EUROPE))}</td><td>${fmtN(num(r.RUSSIA))}</td></tr>`;
     });
 }
 
@@ -2885,7 +2658,7 @@ function renderCoPacking() {
     const cpTb = document.querySelector('#tblCoPacking tbody');
     const cpFiltered = cust !== 'all' ? cp.filter(r => (r['Short Text']||'').toLowerCase().includes(cust.toLowerCase())) : cp;
     cpFiltered.slice(-50).forEach(r => {
-        cpTb.innerHTML += `<tr><td>${r['Month Name']||r.Month||''}</td><td>${r['Purchasing Document']||''}</td><td>${r.Material||''}</td><td>${(r['Short Text']||'').substring(0,40)}</td><td>${fmtN(num(r['Production Qty (Cases)']))}</td><td>${r['Price Per Unit']||''}</td><td><span class="pill ${(r.Remarks||'').includes('SHRINK')?'orange':'green'}">${r.Remarks||''}</span></td></tr>`;
+        cpTb.innerHTML += `<tr><td>${esc(r['Month Name']||r.Month)}</td><td>${esc(r['Purchasing Document'])}</td><td>${esc(r.Material)}</td><td>${esc((r['Short Text']||'').substring(0,40))}</td><td>${fmtN(num(r['Production Qty (Cases)']))}</td><td>${esc(r['Price Per Unit'])}</td><td><span class="pill ${(r.Remarks||'').includes('SHRINK')?'orange':'green'}">${esc(r.Remarks)}</span></td></tr>`;
     });
 }
 
@@ -2922,449 +2695,6 @@ function renderEnvironment() {
         },
         options:{scales:{y:{title:{display:true,text:'°C'},suggestedMin:15,suggestedMax:35},x:{ticks:{maxRotation:45,font:{size:9},maxTicksLimit:30}}}}
     });
-}
-
-// ==================== DATA VALIDATION ====================
-const VALIDATION_RULES = {
-    stockFlow: {
-        label: '1. Stock Flow', sheet: '1. Stock Flow',
-        required: ['Month','Inbound','Outbound','Closing Stock'],
-        numeric: ['Opening Stock','Inbound','Outbound','Closing Stock','Difference'],
-        dateCol: 'Month',
-        custom(rows) {
-            const issues = [];
-            rows.forEach((r,i) => {
-                const cs = num(r['Closing Stock']), os = num(r['Opening Stock']), ib = num(r.Inbound), ob = num(r.Outbound);
-                if (os && ib && ob && cs) {
-                    const expected = os + ib - ob;
-                    if (Math.abs(cs - expected) > 1) issues.push({row:i+1, msg:`Closing Stock (${fmt(cs)}) ≠ Opening + Inbound - Outbound (${fmt(expected)})`, severity:'error'});
-                }
-            });
-            return issues;
-        }
-    },
-    costingDet: {
-        label: '14. Costing Details (Costs)', sheet: '14. Costing Details',
-        required: ['Month-Year','Hub'],
-        numeric: ['Storage','Handling IN','Handling Out','Pick & Pack','Outbound Processing','Over Time','Manag. Fees','Total'],
-        dateCol: 'Month-Year',
-        custom(rows) {
-            const issues = [];
-            rows.forEach((r,i) => {
-                const components = num(r.Storage)+num(r['Handling IN'])+num(r['Handling Out'])+num(r['Pick & Pack'])+num(r['Outbound Processing'])+num(r['Over Time'])+num(r['Manag. Fees']);
-                const total = num(r.Total) || num(r['Total price (AED)']);
-                if (components > 0 && total > 0 && Math.abs(components - total) > 1) issues.push({row:i+1, msg:`Component sum (${fmt(components)}) ≠ Total (${fmt(total)}) for ${r.Hub}`, severity:'warning'});
-            });
-            return issues;
-        }
-    },
-    costingCases: {
-        label: '14. Costing Details (Cases)', sheet: '14. Costing Details',
-        required: ['Month-Year','Total Cases'],
-        numeric: ['Inbound Cases','Outbound Cases','Storage Cases','Total Cases','Pallets In','Pallets Out','Total Pallets'],
-        dateCol: 'Month-Year'
-    },
-    waitingCharges: {
-        label: '2. Waiting Charges', sheet: '2. Waiting Charges',
-        required: ['Month&Year'],
-        numeric: ['KSA','OMAN','UAE','Bahrain','Kuwait','Total'],
-        dateCol: 'Month&Year',
-        custom(rows) {
-            const issues = [];
-            rows.forEach((r,i) => {
-                const sum = num(r.KSA)+num(r.OMAN)+num(r.UAE)+num(r.Bahrain)+num(r.Kuwait);
-                const total = num(r.Total);
-                if (sum > 0 && total > 0 && Math.abs(sum - total) > 1) issues.push({row:i+1, msg:`Country sum (${fmt(sum)}) ≠ Total (${fmt(total)})`, severity:'error'});
-            });
-            return issues;
-        }
-    },
-    inboundFlow: {
-        label: '3. Inbound Flow', sheet: '3. Inbound Flow',
-        required: ['Month','Week No.','Cases'],
-        numeric: ['Cases','Pallets'],
-        dateCol: 'Month'
-    },
-    hubInbound: {
-        label: '4. Hub Inbound', sheet: '4. Hub Inbound',
-        required: ['Date','Vendor Name','Hub','Cases'],
-        numeric: ['Pallets','Cases','Planned Cases'],
-        dateCol: 'Date'
-    },
-    inboundSummary: {
-        label: '5. Inbound Summary', sheet: '5. Inbound Summary',
-        required: ['Year','Site','Type'],
-        numeric: ['January','February','March','April','May','June','July','August','September','October','November','December','Total'],
-        custom(rows) {
-            const issues = [];
-            const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-            rows.forEach((r,i) => {
-                const sum = months.reduce((s,m) => s + num(r[m]), 0);
-                const total = num(r.Total);
-                if (sum > 0 && total > 0 && Math.abs(sum - total) > 10) issues.push({row:i+1, msg:`Month sum (${fmt(sum)}) ≠ Total (${fmt(total)}) for ${r.Site} ${r.Type}`, severity:'warning'});
-            });
-            return issues;
-        }
-    },
-    outboundCases: {
-        label: '6. Outbound Cases', sheet: '6. Outbound Cases',
-        required: ['Year','Site','Type'],
-        numeric: ['January','February','March','April','May','June','July','August','September','October','November','December','Total'],
-        custom(rows) {
-            const issues = [];
-            const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-            rows.forEach((r,i) => {
-                const sum = months.reduce((s,m) => s + num(r[m]), 0);
-                const total = num(r.Total);
-                if (sum > 0 && total > 0 && Math.abs(sum - total) > 10) issues.push({row:i+1, msg:`Month sum (${fmt(sum)}) ≠ Total (${fmt(total)}) for ${r.Site}`, severity:'warning'});
-            });
-            return issues;
-        }
-    },
-    hubOutbound: {
-        label: '7. Hub Outbound', sheet: '7. Hub Outbound',
-        required: ['Month Name','Customer'],
-        numeric: ['Grand Total'],
-        dateCol: 'Month Name'
-    },
-    freights: {
-        label: '8. Freights', sheet: '8. Freights',
-        required: ['Year','Country'],
-        numeric: ['Total Cases','Total Trucks','Total Freight','Total Pallets','Freight Per Case','Freight Per Truck'],
-        custom(rows) {
-            const issues = [];
-            rows.forEach((r,i) => {
-                const fpc = num(r['Freight Per Case']), tf = num(r['Total Freight']), tc = num(r['Total Cases']);
-                if (tf > 0 && tc > 0 && fpc > 0) {
-                    const expected = tf / tc;
-                    if (Math.abs(fpc - expected) > 0.5) issues.push({row:i+1, msg:`Freight/Case (${fpc.toFixed(2)}) ≠ Total Freight / Total Cases (${expected.toFixed(2)})`, severity:'warning'});
-                }
-            });
-            return issues;
-        }
-    },
-    damages: {
-        label: '9. Damages', sheet: '9. Damages',
-        required: ['Year','Month','Site Name'],
-        numeric: ['GRN Qty in Cases','Leakage','Product Damage','Unit Shorage','Damaged / Short Units Qty in cases'],
-        dateCol: 'Month'
-    },
-    qualityIssues: {
-        label: '10. Quality Issues', sheet: '10. Quality Issues',
-        required: ['Month','Issues','Vendor Name'],
-        dateCol: 'Month'
-    },
-    customerComplaints: {
-        label: '11. Customer Complaints', sheet: '11. Customer Complaints',
-        required: ['SR #','Date','Customer Name'],
-        dateCol: 'Date'
-    },
-    inboundIssues: {
-        label: '12. Inbound Issues', sheet: '12. Inbound Issues',
-        required: ['SR #','Date','Vendor Name'],
-        dateCol: 'Date'
-    },
-    palletAging: {
-        label: '13. Pallet Aging', sheet: '13. Pallet Aging',
-        required: ['Month','Description'],
-        numeric: ['No of Pallets'],
-        dateCol: 'Month'
-    },
-    invoiceSummary: {
-        label: '15. Invoice Summary', sheet: '15. Invoice Summary',
-        required: ['Month','DESCRIPTION OF GOODS / SERVICES'],
-        dateCol: 'Month'
-    },
-    weeklyOrders: {
-        label: '16. Weekly Orders', sheet: '16. Weekly Orders',
-        required: ['Month','Week','No of Orders'],
-        numeric: ['No of Orders','Order in Cases','Shipped Cases'],
-        dateCol: 'Month'
-    },
-    manualOrders: {
-        label: '17. Manual Orders', sheet: '17. Manual Orders',
-        required: ['Month&Year'],
-        numeric: ['Total # Orders',"API's Order",'Manual Orders'],
-        dateCol: 'Month&Year'
-    },
-    storage: {
-        label: '18. Storage Optimization', sheet: '18. Storage',
-        required: ['Month'],
-        numeric: ['Total No.of Pallet Locations'],
-        dateCol: 'Month'
-    },
-    storageHub: {
-        label: '18. Storage Hub', sheet: '18. Storage',
-        required: ['Year','Hub'],
-        numeric: ['January','February','March','April','May','June','July','August','September','October','November','December']
-    },
-    tempReport: {
-        label: '19. Temperature Report', sheet: '19. Temp Report',
-        required: ['Date','Max. temperature','Min. temperature'],
-        numeric: ['Max. temperature','Min. temperature','Average'],
-        dateCol: 'Date',
-        custom(rows) {
-            const issues = [];
-            rows.forEach((r,i) => {
-                const max = num(r['Max. temperature']), min = num(r['Min. temperature']);
-                if (max > 0 && min > 0 && min > max) issues.push({row:i+1, msg:`Min temp (${min}) > Max temp (${max})`, severity:'error'});
-                if (max > 50) issues.push({row:i+1, msg:`Max temp (${max}°C) abnormally high`, severity:'warning'});
-                if (min < -10) issues.push({row:i+1, msg:`Min temp (${min}°C) abnormally low`, severity:'warning'});
-            });
-            return issues;
-        }
-    },
-    coPacking: {
-        label: '20. Co-Packing', sheet: '20. Co-Packing',
-        required: ['Month'],
-        numeric: ['Number of Units','Number of Cases','Total Amount'],
-        dateCol: 'Month'
-    },
-    copackingOrders: {
-        label: '20. Co-Packing Orders', sheet: '20. Co-Packing',
-        required: ['Month'],
-        numeric: ['No of Orders',"No of SKU's"],
-        dateCol: 'Month'
-    },
-    copackingWeekly: {
-        label: '20. Co-Packing Weekly', sheet: '20. Co-Packing',
-        required: ['Customer Name','Month','Week'],
-        numeric: ['No.of Orders','No.of Cases'],
-        dateCol: 'Month'
-    },
-    expiredStock: {
-        label: '21. Expired Stock', sheet: '21. Expired Stock',
-        required: ['Description','Expiry Date'],
-        numeric: ['Sum of Total Quantity'],
-        dateCol: 'Month Name'
-    },
-    whDamages: {
-        label: '22. WH Damages', sheet: '22. WH Damages',
-        required: ['Month','Description'],
-        numeric: ['Total Quantity'],
-        dateCol: 'Month'
-    },
-    truckTurnover: {
-        label: '23. Truck Turnover', sheet: '23. Truck Turnover',
-        required: ['Month','Site','DN No'],
-        numeric: ['No of Cases','No of Pallets'],
-        dateCol: 'Month'
-    },
-    subjects: {
-        label: '24. Action Items', sheet: '24. Subjects',
-        required: ['Description','Status'],
-        custom(rows) {
-            const issues = [];
-            const open = rows.filter(r => (r.Status||'').toLowerCase() === 'open');
-            if (open.length > 20) issues.push({row:0, msg:`${open.length} items still Open — review for stale entries`, severity:'info'});
-            const closed = rows.filter(r => (r.Status||'').toLowerCase() === 'closed' || (r.Status||'').toLowerCase() === 'done');
-            if (closed.length) issues.push({row:0, msg:`${closed.length} items Closed/Done, ${open.length} Open`, severity:'info'});
-            return issues;
-        }
-    },
-    ytdTrends: {
-        label: '25. YTD Trends', sheet: '25. YTD Trends',
-        required: ['Month','Description','Value'],
-        numeric: ['Value'],
-        dateCol: 'Month'
-    },
-    inbGrnMonthly: {
-        label: '26. Inbound GRN Monthly', sheet: '26. Inb GRN Monthly',
-        required: ['Month-Year','Week'],
-        numeric: ['GRN Cases','Planned cases'],
-        dateCol: 'Month-Year'
-    },
-    fzeSkuGw: {
-        label: '27. FZE SKU GW', sheet: '27. FZE SKU GW',
-        required: ['Year - Month','Item Code','Description'],
-        dateCol: 'Year - Month'
-    }
-};
-
-function validateDataset(key, rules) {
-    const rows = DATA[key];
-    const result = {key, label: rules.label, sheet: rules.sheet, status: 'pass', total: 0, nonEmpty: 0, errors: [], warnings: [], info: []};
-
-    if (!rows || !Array.isArray(rows)) {
-        result.status = 'missing';
-        result.errors.push({row:0, msg:'Dataset not found in extracted data', severity:'error'});
-        return result;
-    }
-
-    result.total = rows.length;
-    if (result.total === 0) {
-        result.status = 'empty';
-        result.errors.push({row:0, msg:'Dataset is empty — no rows extracted', severity:'error'});
-        return result;
-    }
-
-    const cols = Object.keys(rows[0]);
-    const nonEmptyRows = rows.filter(r => cols.some(c => r[c] && String(r[c]).trim()));
-    result.nonEmpty = nonEmptyRows.length;
-
-    const emptyRatio = 1 - (result.nonEmpty / result.total);
-    if (emptyRatio > 0.3 && result.total > 5) result.warnings.push({row:0, msg:`${((emptyRatio)*100).toFixed(0)}% of rows are completely empty (${result.total - result.nonEmpty} of ${result.total})`, severity:'warning'});
-
-    if (rules.required) {
-        rules.required.forEach(col => {
-            if (!cols.includes(col)) {
-                result.errors.push({row:0, msg:`Required column "${col}" is missing from the data`, severity:'error'});
-                return;
-            }
-            let missing = 0;
-            nonEmptyRows.forEach((r,i) => { if (!r[col] || !String(r[col]).trim()) missing++; });
-            if (missing > 0) {
-                const pct = ((missing/nonEmptyRows.length)*100).toFixed(0);
-                const sev = missing > nonEmptyRows.length * 0.5 ? 'error' : 'warning';
-                result[sev === 'error' ? 'errors' : 'warnings'].push({row:0, msg:`"${col}" is blank in ${missing} of ${nonEmptyRows.length} rows (${pct}%)`, severity: sev});
-            }
-        });
-    }
-
-    if (rules.numeric) {
-        rules.numeric.forEach(col => {
-            if (!cols.includes(col)) return;
-            let nonNumeric = 0, negatives = 0;
-            nonEmptyRows.forEach((r,i) => {
-                const v = r[col];
-                if (v && String(v).trim() && isNaN(num(v)) && num(v) === 0 && !/^[0.,\s-]+$/.test(String(v))) nonNumeric++;
-                if (num(v) < 0) negatives++;
-            });
-            if (nonNumeric > 0) result.warnings.push({row:0, msg:`"${col}" has ${nonNumeric} non-numeric values`, severity:'warning'});
-            if (negatives > 0) result.info.push({row:0, msg:`"${col}" has ${negatives} negative values`, severity:'info'});
-        });
-    }
-
-    if (rules.dateCol && cols.includes(rules.dateCol)) {
-        let badDates = 0;
-        nonEmptyRows.forEach(r => {
-            const v = r[rules.dateCol];
-            if (!v || !String(v).trim()) return;
-            const s = String(v).trim();
-            if (!/[a-zA-Z]/.test(s) && !/[-\/]/.test(s)) badDates++;
-        });
-        if (badDates > 0) result.warnings.push({row:0, msg:`"${rules.dateCol}" has ${badDates} unconverted date serials`, severity:'warning'});
-    }
-
-    const dupeCheck = rules.required ? rules.required.slice(0, 3) : [];
-    if (dupeCheck.length >= 2 && dupeCheck.every(c => cols.includes(c))) {
-        const seen = new Set();
-        let dupes = 0;
-        nonEmptyRows.forEach(r => {
-            const k = dupeCheck.map(c => String(r[c]||'').trim()).join('|');
-            if (seen.has(k)) dupes++;
-            seen.add(k);
-        });
-        if (dupes > 0 && dupes < nonEmptyRows.length * 0.8) result.info.push({row:0, msg:`${dupes} potential duplicate rows (by ${dupeCheck.join(' + ')})`, severity:'info'});
-    }
-
-    if (rules.custom) {
-        const custom = rules.custom(nonEmptyRows);
-        custom.forEach(issue => {
-            result[issue.severity === 'error' ? 'errors' : issue.severity === 'warning' ? 'warnings' : 'info'].push(issue);
-        });
-    }
-
-    if (result.errors.length > 0) result.status = 'fail';
-    else if (result.warnings.length > 0) result.status = 'warn';
-    else result.status = 'pass';
-
-    return result;
-}
-
-let _validationResults = [];
-
-function renderValidation() {
-    const el = document.getElementById('validationResults');
-    if (_validationResults.length === 0) {
-        el.innerHTML = '<div style="color:#888;font:14px Calibri;padding:20px;text-align:center">Click <strong>Run Full Validation</strong> to check all sheets.</div>';
-        document.getElementById('validationSummaryCards').innerHTML = '';
-    }
-}
-
-function runValidation() {
-    const btn = document.getElementById('btnRunValidation');
-    const status = document.getElementById('validationStatus');
-    const container = document.getElementById('validationResults');
-    btn.disabled = true;
-    btn.textContent = '⏳ Validating...';
-    container.innerHTML = '';
-    _validationResults = [];
-
-    const keys = Object.keys(VALIDATION_RULES);
-    let idx = 0;
-
-    function processNext() {
-        if (idx >= keys.length) {
-            btn.disabled = false;
-            btn.innerHTML = '&#9654; Run Full Validation';
-            renderValidationSummary();
-            status.textContent = `Completed: ${keys.length} datasets checked at ${new Date().toLocaleTimeString()}`;
-            return;
-        }
-        const key = keys[idx];
-        const rules = VALIDATION_RULES[key];
-        status.textContent = `Checking ${idx+1}/${keys.length}: ${rules.label}...`;
-        const result = validateDataset(key, rules);
-        _validationResults.push(result);
-        container.appendChild(buildResultCard(result, idx+1));
-        idx++;
-        setTimeout(processNext, 30);
-    }
-    processNext();
-}
-
-function renderValidationSummary() {
-    const passed = _validationResults.filter(r => r.status === 'pass').length;
-    const warned = _validationResults.filter(r => r.status === 'warn').length;
-    const failed = _validationResults.filter(r => r.status === 'fail' || r.status === 'missing' || r.status === 'empty').length;
-    const totalIssues = _validationResults.reduce((s,r) => s + r.errors.length + r.warnings.length, 0);
-
-    document.getElementById('validationSummaryCards').innerHTML =
-        makeCard('Datasets Checked', String(_validationResults.length), 'Total sheets validated') +
-        makeCard('Passed', String(passed), 'No issues found', null, '') +
-        makeCard('Warnings', String(warned), 'Minor issues detected', null, 'orange') +
-        makeCard('Failed', String(failed), `${totalIssues} total issues`, null, 'orange');
-}
-
-function buildResultCard(result, index) {
-    const statusIcon = {pass:'&#10004;', warn:'&#9888;', fail:'&#10008;', missing:'&#10008;', empty:'&#10008;'}[result.status];
-    const statusColor = {pass:'#2E7D32', warn:'#E65100', fail:'#C62828', missing:'#C62828', empty:'#C62828'}[result.status];
-    const statusLabel = {pass:'PASSED', warn:'WARNINGS', fail:'FAILED', missing:'MISSING', empty:'EMPTY'}[result.status];
-
-    const card = document.createElement('div');
-    card.style.cssText = 'background:#fff;border-radius:8px;margin-bottom:10px;border-left:4px solid '+statusColor+';overflow:hidden';
-
-    let issuesHTML = '';
-    const allIssues = [...result.errors, ...result.warnings, ...result.info];
-    if (allIssues.length > 0) {
-        const issueRows = allIssues.map(iss => {
-            const ic = {error:'#C62828',warning:'#E65100',info:'#1565C0'}[iss.severity];
-            const il = {error:'ERROR',warning:'WARNING',info:'INFO'}[iss.severity];
-            return `<div style="display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-bottom:1px solid #f0f0f0">
-                <span style="background:${ic};color:#fff;font:600 10px Calibri;padding:2px 6px;border-radius:3px;white-space:nowrap">${il}</span>
-                <span style="font:13px Calibri;color:#333;flex:1">${iss.msg}${iss.row ? ` <span style="color:#999">(row ${iss.row})</span>` : ''}</span>
-            </div>`;
-        }).join('');
-        issuesHTML = `<div id="valIssues${index}" style="display:none;padding:8px 16px 12px;background:#fafafa;border-top:1px solid #eee">${issueRows}</div>`;
-    }
-
-    card.innerHTML = `
-        <div onclick="this.nextElementSibling&&(this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none')" style="display:flex;align-items:center;padding:12px 16px;cursor:${allIssues.length?'pointer':'default'};gap:12px">
-            <span style="font:600 14px Calibri;color:#999;min-width:28px">#${index}</span>
-            <span style="font:600 14px Calibri;color:${statusColor};min-width:24px">${statusIcon}</span>
-            <div style="flex:1">
-                <div style="font:600 14px Calibri;color:#333">${result.label}</div>
-                <div style="font:12px Calibri;color:#888">${result.nonEmpty} rows${result.total !== result.nonEmpty ? ` (${result.total} total)` : ''} &bull; Sheet: ${result.sheet}</div>
-            </div>
-            <span style="background:${statusColor};color:#fff;font:600 11px Calibri;padding:3px 10px;border-radius:4px">${statusLabel}</span>
-            ${result.errors.length ? `<span style="background:#C62828;color:#fff;font:600 11px Calibri;padding:3px 8px;border-radius:4px">${result.errors.length} errors</span>` : ''}
-            ${result.warnings.length ? `<span style="background:#E65100;color:#fff;font:600 11px Calibri;padding:3px 8px;border-radius:4px">${result.warnings.length} warnings</span>` : ''}
-            ${result.info.length ? `<span style="background:#1565C0;color:#fff;font:600 11px Calibri;padding:3px 8px;border-radius:4px">${result.info.length} info</span>` : ''}
-            ${allIssues.length ? '<span style="font:12px Calibri;color:#999">▸</span>' : ''}
-        </div>
-        ${issuesHTML}`;
-    return card;
 }
 
 // ==================== EXCEL INTEGRATION ====================
@@ -3428,38 +2758,6 @@ async function syncData() {
     }
 }
 
-async function uploadExcel(input) {
-    const file = input.files[0];
-    if (!file) return;
-    if (!file.name.endsWith('.xlsx')) {
-        showToast('Only .xlsx files are accepted', 'var(--rust)', 4000);
-        input.value = '';
-        return;
-    }
-    const btn = document.getElementById('uploadBtn');
-    btn.disabled = true;
-    btn.textContent = 'Uploading...';
-    showToast('Uploading ' + file.name + '...', 'var(--orange)');
-    try {
-        const formData = new FormData();
-        formData.append('file', file);
-        const res = await fetch('/api/upload', {method: 'POST', body: formData});
-        const data = await res.json();
-        if (data.ok) {
-            showToast('Upload complete — extracting data...', 'var(--green)', 3000);
-            pollExtraction();
-        } else {
-            showToast('Upload error: ' + (data.error||''), 'var(--rust)', 5000);
-            btn.disabled = false;
-            btn.innerHTML = '&#x21E7; Upload';
-        }
-    } catch(e) {
-        showToast('Upload failed — server not reachable', 'var(--rust)', 5000);
-        btn.disabled = false;
-        btn.innerHTML = '&#x21E7; Upload';
-    }
-    input.value = '';
-}
 
 function pollExtraction() {
     const panel = document.getElementById('extractProgress');
@@ -3496,8 +2794,6 @@ function pollExtraction() {
                     const btn = document.getElementById('syncBtn');
                     btn.disabled = false;
                     btn.innerHTML = '&#x21BB; Sync';
-                    const ubtn = document.getElementById('uploadBtn');
-                    if (ubtn) { ubtn.disabled = false; ubtn.innerHTML = '&#x21E7; Upload'; }
                 }
             }
         } catch(e) {}
@@ -3581,13 +2877,18 @@ async function checkServerStatus() {
 }
 
 checkServerStatus();
+fetch('/api/agent-status').then(r=>r.json()).then(d=>{if(d.hasKey||d.ollamaRunning){const t=document.getElementById('haloAiToggle');if(t)t.checked=true;}}).catch(()=>{});
 
 // ==================== HALO AGENT (client-side, no LLM) ====================
 function toggleHaloChat() {
     const ov = document.getElementById('haloChatOverlay');
     ov.classList.toggle('show');
-    if (ov.classList.contains('show'))
+    if (ov.classList.contains('show')) {
+        const body = document.getElementById('haloChatBody');
+        body.innerHTML = '<div class="halo-msg bot">Hi! I\'m <strong>Halo</strong>, your data agent. Ask me about costs, stock, inbound/outbound, damages, orders, storage, trucks, or any KPI. Toggle <strong>AI</strong> above for smarter answers powered by Groq.</div>';
+        _haloChatHistory.length = 0;
         setTimeout(() => document.getElementById('haloChatInput').focus(), 300);
+    }
 }
 
 function addHaloMsg(text, type) {
@@ -3595,7 +2896,7 @@ function addHaloMsg(text, type) {
     const div = document.createElement('div');
     div.className = 'halo-msg ' + type;
     if (type === 'bot') {
-        div.innerHTML = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
+        div.innerHTML = esc(text).replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
     } else {
         div.textContent = text;
     }
@@ -3605,231 +2906,681 @@ function addHaloMsg(text, type) {
 
 const _haloAgent = {
     _n: v => { const n = parseFloat(String(v).replace(/,/g, '')); return isNaN(n) ? 0 : n; },
+    _timeToMin: v => { const m = String(v||'').trim().match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/); return m ? (+m[1])*60 + (+m[2]) + (+m[3]||0)/60 : null; },
+    _minToTime: m => { const h = Math.floor(m/60); const mn = Math.floor(m%60); const s = Math.round((m%1)*60); return `${String(h).padStart(2,'0')}:${String(mn).padStart(2,'0')}:${String(s).padStart(2,'0')}`; },
+    _isTimeCol: (rows, col) => rows.slice(0,5).some(r => /^\d{1,2}:\d{2}(:\d{2})?$/.test(String(r[col]||'').trim())),
+    _fmtVal: (v, agg) => agg && agg.isTime ? _haloAgent._minToTime(v) : _haloAgent._fmt(v),
     _fmt: v => { if (Math.abs(v) >= 1e6) return (v/1e6).toFixed(1)+'M'; if (Math.abs(v) >= 1e3) return (v/1e3).toFixed(1)+'K'; return v % 1 === 0 ? v.toLocaleString() : v.toFixed(2); },
-    _months: rows => {
-        const mCols = ['Month-Year','Month','month','Month-year'];
-        for (const c of mCols) { if (rows[0] && rows[0][c] !== undefined) return c; }
-        return null;
+    _ctx: { lastDs: null, lastValCol: null, lastGroupCol: null, lastTime: null },
+    _mNames: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+
+    _synonyms: {
+        freight:['freight','shipping','shipment','shipments','logistics','transport','transportation','delivery','deliveries','carrier','carriers'],
+        cost:['cost','costing','expense','expenses','spend','spending','spent','charge','charges','price','pricing','rate','rates','fee','fees','bill','billing','payment'],
+        cases:['cases','case','units','unit','quantity','quantities','qty','pieces','pcs','cartons','boxes','volume'],
+        stock:['stock','inventory','warehouse stock','opening stock','closing stock','balance'],
+        inbound:['inbound','incoming','received','receiving','receipt','receipts','arrival','arrivals','grn'],
+        outbound:['outbound','outgoing','dispatched','dispatch','shipped','shipping out','sent','sending','despatch'],
+        damage:['damage','damages','damaged','broken','defective','defect','spoiled','spoilage','loss','losses','breakage'],
+        quality:['quality','quality issue','quality issues','qa','qc','inspection','deficiency','non-conformance','ncr'],
+        complaint:['complaint','complaints','customer complaint','feedback','grievance','escalation','escalations'],
+        order:['order','orders','purchase order','po','booking','bookings'],
+        pallet:['pallet','pallets','pallet aging','aging','ageing'],
+        waiting:['waiting','waiting charge','demurrage','detention','delay','delays','idle','idle time'],
+        invoice:['invoice','invoices','invoicing','bill','billing'],
+        temperature:['temperature','temp','temps','cold chain','cooling','thermal','heat'],
+        storage:['storage','warehousing','warehouse space','capacity','utilization','occupancy'],
+        expired:['expired','expiry','expiring','shelf life','best before','use by','obsolete'],
+        truck:['truck','trucks','vehicle','vehicles','turnaround','tat','loading','unloading','dock','docking'],
+        copacking:['copacking','co-packing','copack','co-pack','repacking','repack','value added','vas'],
+        hub:['hub','hubs','warehouse','warehouses','facility','facilities','site','sites','location','locations','dc','distribution'],
+        vendor:['vendor','vendors','supplier','suppliers','manufacturer','manufacturers','source'],
+        country:['country','countries','origin','destination','nation','region','geography'],
+        sku:['sku','skus','product','products','item','items','article','material'],
+        subject:['subject','subjects','action','actions','action item','follow up','followup','meeting','minutes'],
+        ytd:['ytd','year to date','cumulative','running total','annual']
     },
-    _latest: (rows, mCol) => {
-        if (!mCol || !rows.length) return rows;
-        const months = [...new Set(rows.map(r => r[mCol]).filter(Boolean))];
-        const last = months[months.length - 1];
-        return rows.filter(r => r[mCol] === last);
+    _dsMap: {
+        freight:['freights'], cost:['costingDet','costingCases'], cases:['freights','costingCases'],
+        stock:['stockFlow'], inbound:['hubInbound','inboundFlow','inboundSummary','inboundDetail','inbGrnMonthly','stockFlow'],
+        outbound:['hubOutbound','outboundCases','stockFlow'], quality:['qualityIssues'],
+        damage:['damages','whDamages'], complaint:['customerComplaints'],
+        copacking:['coPacking','copackingOrders','copackingWeekly'],
+        order:['weeklyOrders','manualOrders','copackingOrders'], pallet:['palletAging'],
+        waiting:['waitingCharges'], invoice:['invoiceSummary'],
+        temperature:['tempReport'], storage:['storage','storageHub'],
+        expired:['expiredStock'], truck:['truckTurnover'],
+        subject:['subjects'], vendor:['hubInbound','qualityIssues','inboundIssues'],
+        hub:['hubInbound','hubOutbound','storageHub'],
+        sku:['fzeSkuGw'], ytd:['ytdTrends'], country:['freights']
     },
+
+    _levDist: (a, b) => {
+        if (a === b) return 0;
+        const m = a.length, n = b.length;
+        const d = Array.from({length:m+1}, (_,i) => Array(n+1).fill(0));
+        for (let i=0;i<=m;i++) d[i][0]=i;
+        for (let j=0;j<=n;j++) d[0][j]=j;
+        for (let i=1;i<=m;i++) for (let j=1;j<=n;j++)
+            d[i][j] = Math.min(d[i-1][j]+1, d[i][j-1]+1, d[i-1][j-1]+(a[i-1]!==b[j-1]?1:0));
+        return d[m][n];
+    },
+
+    _fuzzyMatch: (word, target, threshold) => {
+        if (target.includes(word) || word.includes(target)) return true;
+        if (word.length < 4) return word === target;
+        return _haloAgent._levDist(word, target) <= (threshold || Math.floor(word.length / 4));
+    },
+
+    _nlpParse: q => {
+        const result = { nouns: [], verbs: [], numbers: [], adjectives: [], original: q, lower: q.toLowerCase() };
+        try {
+            if (typeof nlp === 'undefined') return result;
+            const doc = nlp(q);
+            try { result.nouns = doc.nouns().toSingular().out('array').map(w => w.toLowerCase()); } catch(e) {}
+            try { result.verbs = doc.verbs().toInfinitive().out('array').map(w => w.toLowerCase()); } catch(e) {}
+            try { result.numbers = doc.numbers().toNumber().out('array').map(Number).filter(n => !isNaN(n)); } catch(e) {}
+            try { result.adjectives = doc.adjectives().out('array').map(w => w.toLowerCase()); } catch(e) {}
+        } catch(e) {}
+        return result;
+    },
+
+    _parseTime: q => {
+        const ag = _haloAgent;
+        let month = null, year = null;
+        const mMap = {jan:'Jan',january:'Jan',feb:'Feb',february:'Feb',mar:'Mar',march:'Mar',apr:'Apr',april:'Apr',may:'May',jun:'Jun',june:'Jun',jul:'Jul',july:'Jul',aug:'Aug',august:'Aug',sep:'Sep',september:'Sep',oct:'Oct',october:'Oct',nov:'Nov',november:'Nov',dec:'Dec',december:'Dec'};
+        const my = q.match(/\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s*[-\/]?\s*(20\d{2}|\d{2})\b/i);
+        if (my) { month = mMap[my[1].toLowerCase()]; year = my[2].length===2 ? '20'+my[2] : my[2]; }
+        else {
+            const mo = q.match(/\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b/i);
+            if (mo) month = mMap[mo[1].toLowerCase()];
+            const yr = q.match(/\b(20\d{2})\b/); if (yr) year = yr[1];
+        }
+        const d = new Date();
+        if (/\blast\s+month\b/i.test(q)) { d.setMonth(d.getMonth()-1); month = ag._mNames[d.getMonth()]; year = String(d.getFullYear()); }
+        if (/\bthis\s+month\b/i.test(q)) { month = ag._mNames[d.getMonth()]; year = String(d.getFullYear()); }
+        if (/\bthis\s+year\b/i.test(q)) year = String(d.getFullYear());
+        if (/\blast\s+year\b/i.test(q)) year = String(d.getFullYear()-1);
+        const qm = q.match(/\b(?:q|quarter)\s*([1-4])\b/i);
+        if (qm) {
+            const qi = parseInt(qm[1]);
+            const qMonths = [[0,1,2],[3,4,5],[6,7,8],[9,10,11]][qi-1];
+            return { quarter: qi, quarterMonths: qMonths.map(i => ag._mNames[i]), year: year || String(d.getFullYear()) };
+        }
+        if (/\bpast\s+(\d+)\s+months?\b/i.test(q)) {
+            const n = parseInt(q.match(/\bpast\s+(\d+)\s+months?\b/i)[1]);
+            const months = [];
+            for (let i=0; i<n; i++) { const dd = new Date(); dd.setMonth(dd.getMonth()-i); months.push(ag._mNames[dd.getMonth()]+'-'+String(dd.getFullYear()).slice(2)); }
+            return { multiMonth: months };
+        }
+        if (/\blast\s+(\d+)\s+months?\b/i.test(q)) {
+            const n = parseInt(q.match(/\blast\s+(\d+)\s+months?\b/i)[1]);
+            const months = [];
+            for (let i=1; i<=n; i++) { const dd = new Date(); dd.setMonth(dd.getMonth()-i); months.push(ag._mNames[dd.getMonth()]+'-'+String(dd.getFullYear()).slice(2)); }
+            return { multiMonth: months };
+        }
+        return (month || year) ? { month, year } : null;
+    },
+
+    _filterTime: (rows, mCol, tf) => {
+        if (!tf || !mCol) return rows;
+        if (tf.multiMonth) {
+            return rows.filter(r => { const mv = String(r[mCol]||''); return tf.multiMonth.some(m => mv === m); });
+        }
+        if (tf.quarterMonths) {
+            return rows.filter(r => {
+                const mv = String(r[mCol]||'');
+                const y2 = tf.year.slice(2);
+                return tf.quarterMonths.some(qm => mv === qm+'-'+y2 || mv === qm+'-'+tf.year);
+            });
+        }
+        return rows.filter(r => {
+            const mv = String(r[mCol]||''); if (!mv) return false;
+            if (tf.month && tf.year) {
+                const y2 = tf.year.slice(2);
+                return mv===tf.month+'-'+y2 || mv===tf.month+'-'+tf.year || (mv.toLowerCase().startsWith(tf.month.toLowerCase()) && mv.includes(y2));
+            }
+            if (tf.month) return mv.toLowerCase().startsWith(tf.month.toLowerCase());
+            if (tf.year) { const y2 = tf.year.slice(2); return mv.includes('-'+y2) || mv.includes('-'+tf.year) || mv.includes(tf.year); }
+            return true;
+        });
+    },
+
+    _findMonthCol: rows => {
+        if (!rows.length) return null;
+        for (const c of ['Month-Year','Month','month','Month-year']) { if (rows[0][c] !== undefined) return c; }
+        const cols = Object.keys(rows[0]);
+        return cols.find(c => /month|period/i.test(c) && rows.slice(0,3).some(r => /[A-Za-z]/.test(String(r[c]||'')))) || null;
+    },
+
+    _findCategory: (q, parsed) => {
+        const ag = _haloAgent;
+        const compounds = [
+            [/\b(freight cost|shipping cost|transport cost|logistics cost|delivery cost|freight charge|shipping charge|freight expense|shipping expense|spend.+(?:freight|shipping|transport|logistics)|(?:freight|shipping|transport|logistics).+spend)/i, 'freight'],
+            [/\b(inbound case|inbound unit|received case|incoming case)/i, 'inbound'],
+            [/\b(outbound case|dispatched case|shipped case)/i, 'outbound'],
+            [/\b(truck turnaround|vehicle turnaround|loading time|unloading time|dock time|turnaround time)/i, 'truck'],
+            [/\b(hub.+inbound|inbound.+hub|warehouse.+inbound|inbound.+warehouse)/i, 'inbound'],
+            [/\b(hub.+outbound|outbound.+hub|warehouse.+outbound|outbound.+warehouse)/i, 'outbound'],
+            [/\b(quality issue|quality problem|qa issue|inspection issue)/i, 'quality'],
+            [/\b(customer complaint|customer feedback|customer grievance)/i, 'complaint'],
+            [/\b(warehouse damage|storage damage|handling damage)/i, 'damage'],
+            [/\b(hub.+complaint|complaint.+hub|most complaint|complaint.+most|hub.+feedback|feedback.+hub)/i, 'complaint'],
+            [/\b(pallet aging|pallet age|aging pallet)/i, 'pallet'],
+            [/\b(waiting charge|demurrage charge|detention charge)/i, 'waiting'],
+        ];
+        for (const [re, cat] of compounds) { if (re.test(q)) return { cat, directDs: null }; }
+        const words = q.split(/\s+/);
+        const allNouns = [...(parsed.nouns||[]), ...words];
+        let bestCat = null, bestScore = 0, secondScore = 0;
+        for (const [cat, syns] of Object.entries(ag._synonyms)) {
+            let score = 0;
+            for (const syn of syns) {
+                if (syn.includes(' ')) { if (q.includes(syn)) score += syn.split(' ').length * 4; continue; }
+                if (words.includes(syn)) { score += 3; continue; }
+                for (const noun of allNouns) {
+                    if (ag._fuzzyMatch(noun, syn)) { score += 2; break; }
+                }
+            }
+            if (score > bestScore) { secondScore = bestScore; bestScore = score; bestCat = cat; }
+            else if (score > secondScore) { secondScore = score; }
+        }
+        if (bestScore === 0) {
+            for (const w of words) {
+                if (w.length < 3) continue;
+                for (const [dsName, rows] of Object.entries(DATA)) {
+                    if (!Array.isArray(rows) || !rows.length) continue;
+                    if (ag._fuzzyMatch(w, dsName.toLowerCase())) return { cat: null, directDs: [dsName] };
+                    const cols = Object.keys(rows[0]);
+                    for (const c of cols) {
+                        if (ag._fuzzyMatch(w, c.toLowerCase())) return { cat: null, directDs: [dsName] };
+                    }
+                }
+            }
+        }
+        return { cat: bestCat, directDs: null };
+    },
+
+    _pickBestDs: (candidates, q, parsed) => {
+        const ag = _haloAgent;
+        const valid = candidates.filter(d => Array.isArray(DATA[d]) && DATA[d].length);
+        if (valid.length <= 1) return valid[0] || null;
+        const byMatch = q.match(/\b(?:by|per|for each|grouped by)\s+(\w+)/i);
+        const beforeBy = q.match(/\b(\w+)\s+(?:by|per)\b/i);
+        const rawGroup = beforeBy ? beforeBy[1].toLowerCase() : null;
+        const singulars = rawGroup ? [rawGroup, rawGroup.replace(/ies$/, 'y'), rawGroup.replace(/es$/, ''), rawGroup.replace(/s$/, ''), rawGroup + 's'] : [];
+        const groupHint = [...new Set(singulars)];
+        const valHint = byMatch ? byMatch[1].toLowerCase() : null;
+        let bestDs = valid[0], bestScore = -1;
+        const skip = new Set(['the','for','in','of','by','a','an','is','are','was','what','how','this','that','per','me',
+            'total','average','avg','top','bottom','show','list','trend','give','much','many','do','does','did',
+            'month','year','last','from','to','and','or','with','all','about','tell','please']);
+        const words = q.split(/\s+/).filter(w => w.length > 2 && !skip.has(w));
+        const nouns = (parsed.nouns || []).filter(w => !skip.has(w));
+        for (const ds of valid) {
+            const rows = DATA[ds], cols = Object.keys(rows[0]);
+            let score = 0;
+            for (const w of [...new Set([...words, ...nouns])]) {
+                if (cols.some(c => c.toLowerCase().includes(w))) score += 3;
+                if (ds.toLowerCase().includes(w)) score += 4;
+            }
+            if (groupHint.length && groupHint.some(g => cols.some(c => c.toLowerCase().includes(g)))) score += 10;
+            if (valHint && cols.some(c => c.toLowerCase().includes(valHint))) score += 2;
+            const numCols = cols.filter(c => rows.slice(0,5).some(r => ag._n(r[c]) !== 0));
+            score += Math.min(numCols.length, 3);
+            if (score > bestScore) { bestScore = score; bestDs = ds; }
+        }
+        return bestDs;
+    },
+
+    _intent: (q, parsed) => {
+        if (/\b(trend|trending|over time|month.?over.?month|growth|grew|increase[ds]?|decrease[ds]?|comparison|yoy|mom|how.+chang|going up|going down|rising|falling|pattern)\b/i.test(q)) return 'trend';
+        if (/\b(which month|when was|what month|best month|worst month|peak month|highest month|lowest month)\b/i.test(q)) return 'bestMonth';
+        if (/\bmonth.+(?:had|has|have|with|was).+(?:highest|lowest|most|least|biggest|worst|best|peak)\b/i.test(q)) return 'bestMonth';
+        if (/\b(?:highest|lowest|most|least|biggest|worst|best|peak).+month\b/i.test(q)) return 'bestMonth';
+        if (/\b(top|highest|biggest|most|worst|best|largest|maximum|leading|peak|record|which.+(?:has|had|have|get).+most)\b/i.test(q)) return 'top';
+        if (/\b(bottom|lowest|least|smallest|minimum|fewest|weakest|poorest)\b/i.test(q)) return 'bottom';
+        if (/\b(total|sum|how much|how many|count|number of|overall|grand total|aggregate|combined|cumulative)\b/i.test(q)) return 'total';
+        if (/\b(average|avg|mean|per month|per day|per week|monthly average|daily average|typical|normally)\b/i.test(q)) return 'average';
+        if (/\b(latest|recent|current|newest|updated|most recent|what.+now|right now|today)\b/i.test(q)) return 'latest';
+        if (/\b(compare|versus|vs|difference between|which is more|which is higher|which is better|against)\b/i.test(q)) return 'compare';
+        if (/\b(list|show me all|detail|breakdown|give me all|display|enumerate|all the|every)\b/i.test(q)) return 'list';
+        if (/\b(who|which|where)\b/i.test(q)) return 'top';
+        const verbs = parsed.verbs || [];
+        if (verbs.some(v => ['compare','rank','sort'].includes(v))) return 'top';
+        if (verbs.some(v => ['show','display','list','give','tell'].includes(v))) return 'summary';
+        return 'summary';
+    },
+
+    _findValCol: (rows, q, parsed) => {
+        if (!rows.length) return null;
+        const ag = _haloAgent;
+        const cols = Object.keys(rows[0]);
+        const isTime = c => rows.slice(0,5).some(r => /^\d{1,2}:\d{2}(:\d{2})?$/.test(String(r[c]||'').trim()));
+        const isNum = c => isTime(c) || rows.slice(0,15).filter(r => ag._n(r[c]) !== 0).length >= 2;
+        const aliases = {
+            'freight cost':['Total Freight','Freight Cost','Total Cost','Freight'],
+            'shipping cost':['Total Freight','Freight Cost','Total Cost'],
+            'total cost':['Total Cost','Total','Amount','Total Freight'],
+            'total freight':['Total Freight','Freight Cost'],
+            'total cases':['Total Cases','Cases','No of Cases'],
+            'number of cases':['Total Cases','Cases','No of Cases'],
+            'turnaround time':['Turnover Time','TAT','Turnaround Time','Turnaround','Hours','Days'],
+            'turnaround':['Turnover Time','TAT','Turnaround Time','Turnaround','Hours','Days'],
+            'tat':['TAT','Turnaround Time','Turnover Time','Hours'],
+            'weight':['Weight','Gross Weight','Net Weight','Total Weight','GW'],
+            'damage':['Damage','Damages','Damage Count','Total Damage','Quantity'],
+            'quantity':['Qty','Quantity','Total Cases','Cases','No of Cases'],
+            'amount':['Amount','Total','Value','Total Cost','Total Freight'],
+            'pallet':['Pallets','Pallet Count','No of Pallets','Total Pallets'],
+            'temp':['Temp','Temperature','Max Temp','Min Temp','Avg Temp'],
+            'charge':['Amount','Charge','Charges','Total','Cost'],
+            'invoice':['Amount','Total','Value','Invoice Amount'],
+            'count':['Count','Total','Qty','Quantity'],
+            'cost':['Total Cost','Cost','Amount','Total','Value','Total Freight'],
+            'cases':['Total Cases','Cases','No of Cases','Qty'],
+            'inbound':['Cases','Inbound','GRN Cases','Pallets'],
+            'outbound':['Cases','Outbound','Shipped Cases','Pallets'],
+            'time':['Turnover Time','TAT','Time','Hours','Days','Duration','Turnaround Time'],
+            'turnover':['Turnover Time','TAT','Turnaround Time'],
+            'turnover time':['Turnover Time','TAT','Turnaround Time'],
+            'issue':['Count','Total','Quantity','Issues'],
+            'order':['Qty','Quantity','Cases','Total','Amount','Order Qty'],
+            'stock':['Opening Stock','Closing Stock','Balance','Quantity','Qty'],
+            'rate':['Rate','Price','Unit Price','Cost per Unit'],
+            'spend':['Total Cost','Cost','Amount','Total','Total Freight'],
+            'revenue':['Amount','Total','Revenue','Value'],
+            'price':['Price','Rate','Unit Price','Amount','Cost']
+        };
+        const sortedA = Object.entries(aliases).sort((a,b) => b[0].length - a[0].length);
+        for (const [phrase, cands] of sortedA) {
+            if (q.includes(phrase)) {
+                for (const c of cands) { const f = cols.find(col => col.toLowerCase() === c.toLowerCase()); if (f && isNum(f)) return f; }
+            }
+        }
+        const allWords = [...q.split(/\s+/), ...(parsed.nouns||[])];
+        const skip = new Set(['the','for','in','of','by','a','an','is','are','was','were','what','how','this','that','per','me',
+            'total','average','avg','top','bottom','show','list','trend','give','much','many','do','does','did','can','could',
+            'month','year','weekly','daily','monthly','last','from','to','between','and','or','with','all','each','every',
+            'jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec','about','tell','please',
+            'january','february','march','april','june','july','august','september','october','november','december',
+            '2020','2021','2022','2023','2024','2025','2026','2027']);
+        const filtered = [...new Set(allWords)].filter(w => !skip.has(w) && w.length > 2);
+        for (const w of filtered) {
+            const exact = cols.find(c => c.toLowerCase().includes(w) && isNum(c));
+            if (exact) return exact;
+        }
+        for (const w of filtered) {
+            for (const c of cols) {
+                if (isNum(c) && ag._fuzzyMatch(w, c.toLowerCase().replace(/\s+/g,''))) return c;
+            }
+        }
+        const numCols = cols.filter(c => {
+            if (/month|year|date|name|site|hub|region|entity|vendor|country|type|category|description|sku|item|sr\.?|^no$|^id$/i.test(c)) return false;
+            return isNum(c);
+        });
+        return numCols.length ? numCols[0] : null;
+    },
+
+    _findGroupCol: (rows, q) => {
+        if (!rows.length) return null;
+        const cols = Object.keys(rows[0]);
+        const beforeByM = q.match(/\b(\w+)\s+(?:by|per)\b/i);
+        if (beforeByM) {
+            const h = beforeByM[1].toLowerCase();
+            const vars = [...new Set([h, h.replace(/ies$/,'y'), h.replace(/es$/,''), h.replace(/s$/,''), h+'s'])];
+            const c = cols.find(col => vars.some(v => col.toLowerCase().includes(v)));
+            if (c) return c;
+        }
+        const byM = q.match(/\b(?:by|per|for each|group by|grouped by|across|per each)\s+(\w+)/i);
+        if (byM) { const h = byM[1].toLowerCase(); const vars = [...new Set([h, h.replace(/ies$/,'y'), h.replace(/es$/,''), h.replace(/s$/,''), h+'s'])]; const c = cols.find(col => { const cl = col.toLowerCase(); return vars.some(v => cl.includes(v)) && rows.slice(0,5).some(r => isNaN(parseFloat(String(r[col]||'').replace(/,/g,'')))); }); if (c) return c; }
+        const hints = ['country','hub','region','site','entity','vendor','customer','supplier','sku','item','product','category','type','name','description'];
+        const qw = q.split(/\s+/).flatMap(w => [w, w.replace(/ies$/,'y'), w.replace(/es$/,''), w.replace(/s$/,'')]);
+        for (const h of hints) { if (qw.includes(h)) { const c = cols.find(col => col.toLowerCase().includes(h)); if (c) return c; } }
+        for (const h of ['Country','Hub','Region','Site','Entity','Vendor','Customer','Supplier','SKU','Name','Item','Category','Type','Description']) {
+            const c = cols.find(col => col.toLowerCase().includes(h.toLowerCase()));
+            if (c) return c;
+        }
+        const textCols = cols.filter(c => {
+            if (/month|year|date|period/i.test(c)) return false;
+            return rows.slice(0,5).some(v => { const s = String(v[c]||''); return s && isNaN(parseFloat(s.replace(/,/g,''))); });
+        });
+        return textCols[0] || cols[0];
+    },
+
     _agg: (rows, col) => {
-        const vals = rows.map(r => _haloAgent._n(r[col])).filter(v => v !== 0);
+        const ag = _haloAgent;
+        const isTime = ag._isTimeCol(rows, col);
+        if (isTime) {
+            const vals = rows.map(r => ag._timeToMin(r[col])).filter(v => v !== null && v > 0);
+            if (!vals.length) return null;
+            const sum = vals.reduce((a,b) => a+b, 0);
+            return { sum, avg: sum/vals.length, min: Math.min(...vals), max: Math.max(...vals), count: vals.length, isTime: true };
+        }
+        const vals = rows.map(r => ag._n(r[col])).filter(v => v !== 0);
         if (!vals.length) return null;
         const sum = vals.reduce((a,b) => a+b, 0);
         return { sum, avg: sum/vals.length, min: Math.min(...vals), max: Math.max(...vals), count: vals.length };
     },
-    _topN: (rows, col, n=5, asc=false) => {
-        const scored = rows.filter(r => _haloAgent._n(r[col]) !== 0)
-            .map(r => ({row: r, val: _haloAgent._n(r[col])}))
-            .sort((a,b) => asc ? a.val - b.val : b.val - a.val);
-        return scored.slice(0, n);
-    },
-    _trend: (rows, mCol, valCol) => {
-        const byMonth = {};
+
+    _grouped: (rows, groupCol, valCol) => {
+        const ag = _haloAgent;
+        const isTime = ag._isTimeCol(rows, valCol);
+        const groups = {};
+        const counts = {};
         rows.forEach(r => {
-            const m = r[mCol]; if (!m) return;
-            byMonth[m] = (byMonth[m] || 0) + _haloAgent._n(r[valCol]);
+            const g = String(r[groupCol]||'Unknown');
+            const v = isTime ? (ag._timeToMin(r[valCol])||0) : ag._n(r[valCol]);
+            groups[g] = (groups[g]||0) + v;
+            counts[g] = (counts[g]||0) + (v > 0 ? 1 : 0);
         });
+        let result = Object.entries(groups);
+        if (isTime) result = result.map(([g,v]) => [g, counts[g] ? v/counts[g] : 0]);
+        return result.filter(([,v]) => v !== 0).sort((a,b) => b[1]-a[1]);
+    },
+
+    _trend: (rows, mCol, valCol) => {
+        const ag = _haloAgent;
+        const isTime = ag._isTimeCol(rows, valCol);
+        const byMonth = {};
+        const byCnt = {};
+        rows.forEach(r => { const m = r[mCol]; if (m) { const v = isTime ? (ag._timeToMin(r[valCol])||0) : ag._n(r[valCol]); byMonth[m] = (byMonth[m]||0) + v; byCnt[m] = (byCnt[m]||0) + (v>0?1:0); } });
+        if (isTime) Object.keys(byMonth).forEach(m => { if (byCnt[m]) byMonth[m] /= byCnt[m]; });
         const entries = Object.entries(byMonth);
         if (entries.length < 2) return null;
-        const last = entries[entries.length-1][1], prev = entries[entries.length-2][1];
-        const pct = prev !== 0 ? ((last - prev) / Math.abs(prev) * 100) : 0;
-        return { labels: entries.map(e=>e[0]), values: entries.map(e=>e[1]), last, prev, change: pct,
-            lastMonth: entries[entries.length-1][0], prevMonth: entries[entries.length-2][0] };
+        const last = entries[entries.length-1], prev = entries[entries.length-2];
+        const pct = prev[1] !== 0 ? ((last[1]-prev[1])/Math.abs(prev[1])*100) : 0;
+        return { entries, last: last[1], prev: prev[1], change: pct, lastMonth: last[0], prevMonth: prev[0] };
     },
 
-    _datasetMap: {
-        cost: ['costingDet','costingCases'], freight: ['freights'], stock: ['stockFlow'],
-        inbound: ['stockFlow','inboundFlow','inboundSummary','hubInbound','inboundDetail','inbGrnMonthly'],
-        outbound: ['stockFlow','outboundCases','hubOutbound'], quality: ['qualityIssues'],
-        damage: ['damages','whDamages'], complaint: ['customerComplaints'],
-        copacking: ['coPacking','copackingOrders','copackingWeekly'], 'co-packing': ['coPacking','copackingOrders','copackingWeekly'],
-        order: ['weeklyOrders','manualOrders','copackingOrders'], pallet: ['palletAging'],
-        aging: ['palletAging'], waiting: ['waitingCharges'], invoice: ['invoiceSummary'],
-        temp: ['tempReport'], temperature: ['tempReport'], storage: ['storage','storageHub'],
-        expired: ['expiredStock'], expiry: ['expiredStock'], truck: ['truckTurnover'],
-        turnaround: ['truckTurnover'], turnover: ['truckTurnover'],
-        subject: ['subjects'], action: ['subjects'], vendor: ['hubInbound','qualityIssues','inboundIssues'],
-        issue: ['qualityIssues','inboundIssues'], hub: ['hubInbound','hubOutbound','storageHub'],
-        grn: ['inbGrnMonthly'], plan: ['inbGrnMonthly'], sku: ['fzeSkuGw'], ytd: ['ytdTrends']
-    },
-
-    _detectDatasets: q => {
-        const matched = new Set();
-        for (const [kw, ds] of Object.entries(_haloAgent._datasetMap)) {
-            if (q.includes(kw)) ds.forEach(d => matched.add(d));
-        }
-        return matched.size ? [...matched] : null;
-    },
-
-    _detectIntent: q => {
-        if (/\b(trend|trending|over time|month.?over|growth|change|increase|decrease|compare month|monthly)\b/i.test(q)) return 'trend';
-        if (/\b(top|highest|biggest|most|worst|best|largest|maximum)\b/i.test(q)) return 'top';
-        if (/\b(bottom|lowest|least|smallest|minimum|fewest)\b/i.test(q)) return 'bottom';
-        if (/\b(total|sum|how much|how many|count|number of)\b/i.test(q)) return 'total';
-        if (/\b(average|avg|mean|per)\b/i.test(q)) return 'average';
-        if (/\b(latest|recent|current|last|this month|newest)\b/i.test(q)) return 'latest';
-        if (/\b(list|show|all|detail|breakdown|what)\b/i.test(q)) return 'list';
-        if (/\b(help|can you|what can|how to)\b/i.test(q)) return 'help';
-        return 'summary';
-    },
-
-    _detectValueCol: (rows, q) => {
-        if (!rows.length) return null;
-        const cols = Object.keys(rows[0]);
-        const qw = q.toLowerCase().split(/\s+/);
-        for (const w of qw) {
-            const match = cols.find(c => c.toLowerCase().includes(w) && typeof _haloAgent._n(rows[0][c]) === 'number');
-            if (match) return match;
-        }
-        const numCols = cols.filter(c => {
-            const sample = rows.slice(0, 5).map(r => _haloAgent._n(r[c]));
-            return sample.some(v => v !== 0);
-        });
-        return numCols.length ? numCols[numCols.length - 1] : cols[cols.length - 1];
-    },
-
-    _detectGroupCol: (rows, q) => {
-        if (!rows.length) return null;
-        const cols = Object.keys(rows[0]);
-        const prefs = ['Hub','Region','Site','Entity','Vendor','Customer','SKU','Item','Category','Type','Description'];
-        for (const p of prefs) {
-            const c = cols.find(col => col.toLowerCase().includes(p.toLowerCase()));
-            if (c) return c;
-        }
-        return cols[0];
-    },
+    _isFollowUp: q => /\b(what about|and for|how about|same for|also for|now for|and in|what if|show that for|repeat for|do that for)\b/i.test(q) || (q.split(/\s+/).length <= 5 && _haloAgent._ctx.lastDs),
 
     answer: function(question) {
+        const ag = _haloAgent;
         const q = question.toLowerCase().trim();
-        if (!Object.keys(DATA).length) return "No data loaded yet. Please sync the dashboard first.";
+        if (!Object.keys(DATA).length) return "No data loaded yet. Please extract data first by clicking the refresh button.";
 
-        if (/\b(help|what can you|how to use|what do you)\b/i.test(q)) {
-            return "I'm **Halo**, your offline data agent. I can answer questions about your supply chain data.\n\n" +
-                "**Try asking:**\n" +
-                "- \"Total cost this month\"\n" +
-                "- \"Top 5 hubs by inbound cases\"\n" +
-                "- \"Cost trend over time\"\n" +
-                "- \"Latest damages\"\n" +
-                "- \"Average truck turnaround time\"\n" +
-                "- \"Show storage breakdown\"\n" +
-                "- \"How many quality issues?\"\n" +
-                "- \"Bottom 3 vendors by complaints\"\n" +
-                "- \"What datasets are available?\"\n\n" +
-                "I work entirely offline — no API keys needed.";
+        if (/^\s*(hi|hello|hey|greetings|good\s*(morning|afternoon|evening))\s*[.!]?\s*$/i.test(q)) {
+            return "Hello! I'm **Halo**, your supply chain data assistant.\n\nAsk me anything about your data — freight costs, cases, damages, stock levels, quality issues, truck turnaround times, and more.\n\nType **help** for example questions.";
+        }
+        if (/\b(thanks?|thank you|ty|thx|cheers|appreciate)\b/i.test(q) && q.split(/\s+/).length <= 6) return "You're welcome! Ask me anything else.";
+        if (/\b(bye|goodbye|see you|good night)\b/i.test(q)) return "Goodbye! I'll be here whenever you need data insights.";
+
+        if (/\b(help|what can you|how to use|what do you|guide|tutorial|how does this work)\b/i.test(q)) {
+            return "I'm **Halo**, your offline data assistant. I analyze your supply chain data instantly — no internet needed.\n\n" +
+                "**Ask me things like:**\n" +
+                "- \"What is the total freight cost for May 2025?\"\n" +
+                "- \"Top 5 countries by freight cost\"\n" +
+                "- \"How many cases were shipped last month?\"\n" +
+                "- \"Show me the freight trend over time\"\n" +
+                "- \"Average truck turnaround time for Q1 2025\"\n" +
+                "- \"Which hub has the most damages?\"\n" +
+                "- \"Compare costs between last 3 months\"\n" +
+                "- \"How much did we spend on shipping in 2024?\"\n" +
+                "- \"What month had the highest freight?\"\n\n" +
+                "**Time filters:** \"May 2025\", \"last month\", \"this year\", \"Q2 2025\", \"past 6 months\"\n" +
+                "**Grouping:** \"by country\", \"per hub\", \"for each vendor\"\n" +
+                "**Follow-ups:** After any answer, ask \"what about 2024?\" or \"same for last month\"";
         }
 
-        if (/\b(dataset|available|what data|which data|tables?)\b/i.test(q)) {
+        if (/\b(dataset|available|what data|which data|what.+loaded|tables?|sheets?)\b/i.test(q)) {
             const lines = [];
             for (const [k, rows] of Object.entries(DATA)) {
                 if (!Array.isArray(rows) || !rows.length) continue;
-                const cols = Object.keys(rows[0]);
-                lines.push(`**${k}**: ${rows.length} rows — ${cols.slice(0,5).join(', ')}${cols.length>5 ? '...' : ''}`);
+                const cols = Object.keys(rows[0]).filter(c => !/^_/.test(c));
+                lines.push(`**${k}** (${rows.length} rows): ${cols.slice(0,4).join(', ')}${cols.length>4 ? ' ...' : ''}`);
             }
-            return "**Available datasets:**\n" + lines.join('\n');
+            return lines.length ? "Here are all loaded datasets:\n\n" + lines.join('\n') : "No datasets loaded yet.";
         }
 
-        const datasets = this._detectDatasets(q);
-        const intent = this._detectIntent(q);
+        const parsed = ag._nlpParse(question);
+        const timeFilter = ag._parseTime(q);
+        const intent = ag._intent(q, parsed);
 
-        if (!datasets) {
-            const allKeys = Object.keys(DATA).filter(k => Array.isArray(DATA[k]) && DATA[k].length);
-            if (!allKeys.length) return "No data loaded. Please sync.";
-            const summaryLines = [];
-            for (const k of allKeys.slice(0, 8)) {
-                summaryLines.push(`**${k}**: ${DATA[k].length} rows`);
+        let isFollowUp = ag._isFollowUp(q);
+        let dsName, valCol, groupCol;
+
+        if (isFollowUp && ag._ctx.lastDs) {
+            dsName = ag._ctx.lastDs;
+            const newTime = timeFilter;
+            const { cat } = ag._findCategory(q, parsed);
+            if (cat && ag._dsMap[cat]) {
+                const newDs = ag._pickBestDs(ag._dsMap[cat], q, parsed);
+                if (newDs) dsName = newDs;
             }
-            return "I couldn't match your question to a specific dataset. Here's what's loaded:\n\n" +
-                summaryLines.join('\n') + (allKeys.length > 8 ? `\n...and ${allKeys.length-8} more` : '') +
-                "\n\nTry mentioning a topic: cost, stock, inbound, outbound, damage, truck, storage, freight, quality, orders, etc.";
+        } else {
+            const { cat, directDs } = ag._findCategory(q, parsed);
+            let candidates = directDs || (cat ? ag._dsMap[cat] : null);
+
+            if (!candidates) {
+                const allDs = Object.keys(DATA).filter(k => Array.isArray(DATA[k]) && DATA[k].length);
+                if (!allDs.length) return "No data loaded. Please extract data first.";
+                let bestDs = null, bestScore = 0;
+                const words = [...q.split(/\s+/).filter(w => w.length > 2), ...(parsed.nouns||[])];
+                for (const ds of allDs) {
+                    const rows = DATA[ds]; if (!rows.length) continue;
+                    const cols = Object.keys(rows[0]);
+                    let score = 0;
+                    for (const w of words) {
+                        if (ag._fuzzyMatch(w, ds.toLowerCase())) score += 3;
+                        for (const c of cols) { if (ag._fuzzyMatch(w, c.toLowerCase())) score += 2; }
+                        for (const r of rows.slice(0,3)) {
+                            for (const c of cols) { if (String(r[c]||'').toLowerCase().includes(w)) { score += 1; break; } }
+                        }
+                    }
+                    if (score > bestScore) { bestScore = score; bestDs = ds; }
+                }
+                if (bestDs && bestScore >= 2) candidates = [bestDs];
+            }
+
+            if (!candidates) {
+                return "I'm not sure which data you're asking about. Could you rephrase?\n\n" +
+                    "**Try mentioning a topic:** freight, cost, cases, stock, inbound, outbound, damage, quality, truck, storage, orders, complaints\n\n" +
+                    "Or ask \"**what data is available?**\" to see all loaded datasets.";
+            }
+            dsName = ag._pickBestDs(candidates, q, parsed);
         }
 
-        const results = [];
-        for (const dsName of datasets) {
-            const rows = DATA[dsName];
-            if (!Array.isArray(rows) || !rows.length) continue;
-            const mCol = this._months(rows);
-            const valCol = this._detectValueCol(rows, q);
-            const groupCol = this._detectGroupCol(rows, q);
+        if (!dsName || !DATA[dsName]) return "That dataset doesn't seem to have any data loaded.";
 
-            if (intent === 'trend' && mCol && valCol) {
-                const t = this._trend(rows, mCol, valCol);
-                if (t) {
-                    const dir = t.change > 0 ? '📈 increased' : t.change < 0 ? '📉 decreased' : '➡️ stayed flat';
-                    results.push(`**${dsName} — ${valCol} trend:**\n` +
-                        `${t.prevMonth}: **${this._fmt(t.prev)}** → ${t.lastMonth}: **${this._fmt(t.last)}**\n` +
-                        `${dir} by **${Math.abs(t.change).toFixed(1)}%**`);
-                }
-            } else if (intent === 'top') {
-                const nMatch = q.match(/top\s*(\d+)/i);
-                const n = nMatch ? parseInt(nMatch[1]) : 5;
-                const top = this._topN(rows, valCol, n, false);
-                if (top.length) {
-                    const lines = top.map((t,i) => `${i+1}. ${t.row[groupCol] || '—'}: **${this._fmt(t.val)}** ${valCol}`);
-                    results.push(`**Top ${top.length} in ${dsName} by ${valCol}:**\n` + lines.join('\n'));
-                }
-            } else if (intent === 'bottom') {
-                const nMatch = q.match(/bottom\s*(\d+)/i);
-                const n = nMatch ? parseInt(nMatch[1]) : 3;
-                const bottom = this._topN(rows, valCol, n, true);
-                if (bottom.length) {
-                    const lines = bottom.map((t,i) => `${i+1}. ${t.row[groupCol] || '—'}: **${this._fmt(t.val)}** ${valCol}`);
-                    results.push(`**Bottom ${bottom.length} in ${dsName} by ${valCol}:**\n` + lines.join('\n'));
-                }
-            } else if (intent === 'total') {
-                const agg = this._agg(rows, valCol);
-                if (agg) {
-                    results.push(`**${dsName} — ${valCol}:**\nTotal: **${this._fmt(agg.sum)}** across ${agg.count} records`);
-                }
-            } else if (intent === 'average') {
-                const agg = this._agg(rows, valCol);
-                if (agg) {
-                    results.push(`**${dsName} — ${valCol}:**\nAverage: **${this._fmt(agg.avg)}** (from ${agg.count} records)\nRange: ${this._fmt(agg.min)} – ${this._fmt(agg.max)}`);
-                }
-            } else if (intent === 'latest') {
-                const latest = mCol ? this._latest(rows, mCol) : rows.slice(-5);
-                const cols = Object.keys(rows[0]);
-                const showCols = cols.slice(0, 6);
-                const lines = latest.slice(0, 8).map(r => showCols.map(c => `${c}: ${r[c] || '—'}`).join(' | '));
-                const label = mCol && latest[0] ? latest[0][mCol] : 'recent';
-                results.push(`**${dsName} — latest (${label}):** ${latest.length} rows\n` + lines.join('\n'));
-            } else if (intent === 'list') {
-                const cols = Object.keys(rows[0]);
-                const showCols = cols.slice(0, 5);
-                const show = rows.slice(-8);
-                const lines = show.map(r => showCols.map(c => `${c}: ${r[c] || '—'}`).join(' | '));
-                results.push(`**${dsName}** (${rows.length} rows, showing last ${show.length}):\n` + lines.join('\n'));
+        let rows = DATA[dsName];
+        if (!Array.isArray(rows) || !rows.length) return `No data found in **${dsName}**.`;
+
+        const mCol = ag._findMonthCol(rows);
+
+        if (timeFilter && mCol) {
+            const filtered = ag._filterTime(rows, mCol, timeFilter);
+            if (!filtered.length) {
+                const months = [...new Set(rows.map(r => r[mCol]).filter(Boolean))];
+                const available = months.slice(-8).join(', ');
+                const tfLabel = timeFilter.month && timeFilter.year ? timeFilter.month+'-'+timeFilter.year.slice(2) : timeFilter.quarter ? 'Q'+timeFilter.quarter+' '+timeFilter.year : timeFilter.month || timeFilter.year;
+                return `No data found in **${dsName}** for **${tfLabel}**.\n\nAvailable periods: ${available}`;
+            }
+            rows = filtered;
+        }
+
+        valCol = ag._findValCol(rows, q, parsed);
+        groupCol = ag._findGroupCol(rows, q);
+
+        ag._ctx.lastDs = dsName;
+        ag._ctx.lastValCol = valCol;
+        ag._ctx.lastGroupCol = groupCol;
+        ag._ctx.lastTime = timeFilter;
+
+        const tfLabel = timeFilter ? (timeFilter.month && timeFilter.year ? timeFilter.month+'-'+timeFilter.year.slice(2) : timeFilter.quarter ? 'Q'+timeFilter.quarter+' '+timeFilter.year : timeFilter.multiMonth ? 'past months' : timeFilter.month || timeFilter.year) : null;
+        const period = tfLabel ? ` for ${tfLabel}` : '';
+        const src = `\n\n*Source: ${dsName}${tfLabel ? ' | '+tfLabel : ''} | ${rows.length} records*`;
+
+        if (intent === 'bestMonth' && mCol && valCol) {
+            const isTimeC = ag._isTimeCol(rows, valCol);
+            const byMonth = {};
+            const byCnt = {};
+            rows.forEach(r => { const m = r[mCol]; if (m) { const v = isTimeC ? (ag._timeToMin(r[valCol])||0) : ag._n(r[valCol]); byMonth[m] = (byMonth[m]||0) + v; byCnt[m] = (byCnt[m]||0) + (v>0?1:0); } });
+            if (isTimeC) Object.keys(byMonth).forEach(m => { if (byCnt[m]) byMonth[m] /= byCnt[m]; });
+            const sorted = Object.entries(byMonth).sort((a,b) => b[1]-a[1]);
+            if (sorted.length) {
+                const isWorst = /worst|lowest|least|minimum/i.test(q);
+                const pick = isWorst ? sorted[sorted.length-1] : sorted[0];
+                const label = isWorst ? 'Lowest' : 'Highest';
+                const fv = v => isTimeC ? ag._minToTime(v) : ag._fmt(v);
+                let out = `**${label} ${valCol} month${period}:** **${pick[0]}** with **${fv(pick[1])}**\n\n`;
+                out += `All months ranked:\n`;
+                (isWorst ? sorted.slice().reverse().slice(0,5) : sorted.slice(0,5)).forEach(([m,v], i) => {
+                    out += `${i+1}. ${m}: **${fv(v)}**\n`;
+                });
+                return out + src;
+            }
+        }
+
+        if (intent === 'trend' && mCol && valCol) {
+            const t = ag._trend(rows, mCol, valCol);
+            if (t) {
+                const dir = t.change > 0 ? 'Up' : t.change < 0 ? 'Down' : 'Flat';
+                const arrow = t.change > 0 ? '+' : '';
+                let out = `**${valCol} Trend${period}:**\n\n`;
+                const isTimeC = ag._isTimeCol(rows, valCol);
+                const fv = v => isTimeC ? ag._minToTime(v) : ag._fmt(v);
+                t.entries.slice(-8).forEach(([m,v]) => { out += `${m}: **${fv(v)}**\n`; });
+                out += `\n${dir} **${arrow}${t.change.toFixed(1)}%** (${t.prevMonth} vs ${t.lastMonth})`;
+                return out + src;
+            }
+        }
+
+        if ((intent === 'top' || intent === 'bottom') && groupCol) {
+            const useCount = !valCol || /\b(most|least|fewest|which.+has|who.+has|how many|number of|count)\b/i.test(q) && !/\b(cost|amount|freight|weight|qty|quantity|cases|pallets|charge|spend|value|rate|price|time|tat|damage)\b/i.test(q);
+            const nMatch = q.match(/(?:top|bottom|worst|best|highest|lowest)\s*(\d+)/i);
+            const n = nMatch ? parseInt(nMatch[1]) : 5;
+            const asc = intent === 'bottom';
+            let items, rankLabel;
+            if (useCount) {
+                const groups = {};
+                rows.forEach(r => { const g = String(r[groupCol]||'Unknown'); groups[g] = (groups[g]||0) + 1; });
+                items = Object.entries(groups).sort((a,b) => asc ? a[1]-b[1] : b[1]-a[1]).slice(0,n);
+                rankLabel = 'count';
             } else {
-                const agg = valCol ? this._agg(rows, valCol) : null;
-                const mCol2 = mCol;
-                let summary = `**${dsName}**: ${rows.length} rows`;
-                if (agg) summary += `\n${valCol}: Total **${this._fmt(agg.sum)}**, Avg **${this._fmt(agg.avg)}**, Range ${this._fmt(agg.min)}–${this._fmt(agg.max)}`;
-                if (mCol2) {
-                    const months = [...new Set(rows.map(r => r[mCol2]).filter(Boolean))];
-                    summary += `\nMonths covered: ${months[0]} to ${months[months.length-1]} (${months.length} months)`;
-                }
-                results.push(summary);
+                const grouped = ag._grouped(rows, groupCol, valCol);
+                items = asc ? grouped.slice().sort((a,b) => a[1]-b[1]).slice(0,n) : grouped.slice(0,n);
+                rankLabel = valCol;
+            }
+            if (!items.length) return `No data to rank in **${dsName}**${period}.`;
+            const label = asc ? 'Bottom' : 'Top';
+            let out = `**${label} ${items.length} ${groupCol} by ${rankLabel}${period}:**\n\n`;
+            const isTimeC = !useCount && ag._isTimeCol(rows, valCol);
+            const fv = v => isTimeC ? ag._minToTime(v) : ag._fmt(v);
+            items.forEach(([name, val], i) => { out += `${i+1}. **${name}**: ${fv(val)}\n`; });
+            return out + src;
+        }
+
+        if (intent === 'total' && valCol) {
+            const agg = ag._agg(rows, valCol);
+            if (!agg) return `No numeric data found for **${valCol}** in **${dsName}**${period}.`;
+            const totalLabel = /^total/i.test(valCol) ? valCol : 'Total ' + valCol;
+            const fv = v => ag._fmtVal(v, agg);
+            let out = `**${totalLabel}${period}:** **${fv(agg.sum)}**\n`;
+            out += `Records: ${agg.count} | Min: ${fv(agg.min)} | Max: ${fv(agg.max)}`;
+            return out + src;
+        }
+
+        if (intent === 'average' && valCol) {
+            const agg = ag._agg(rows, valCol);
+            if (!agg) return `No numeric data found for **${valCol}** in **${dsName}**${period}.`;
+            const fv = v => ag._fmtVal(v, agg);
+            let out = `**Average ${valCol}${period}:** **${fv(agg.avg)}**\n`;
+            out += `Total: ${fv(agg.sum)} across ${agg.count} records\nRange: ${fv(agg.min)} to ${fv(agg.max)}`;
+            return out + src;
+        }
+
+        if (intent === 'compare' && mCol && valCol) {
+            const t = ag._trend(rows, mCol, valCol);
+            if (t && t.entries.length >= 2) {
+                let out = `**${valCol} Comparison${period}:**\n\n`;
+                const isTimeC = ag._isTimeCol(rows, valCol);
+                const fv = v => isTimeC ? ag._minToTime(v) : ag._fmt(v);
+                t.entries.slice(-6).forEach(([m,v]) => { out += `${m}: **${fv(v)}**\n`; });
+                return out + src;
             }
         }
 
-        if (!results.length) return "I found the datasets but couldn't extract meaningful data for your question. Try being more specific — e.g., \"total cost\" or \"top 5 hubs by inbound\".";
-        return results.join('\n\n');
+        if (intent === 'latest') {
+            const latest = mCol ? (() => {
+                const months = [...new Set(rows.map(r => r[mCol]).filter(Boolean))];
+                return rows.filter(r => r[mCol] === months[months.length-1]);
+            })() : rows.slice(-5);
+            const cols = Object.keys(rows[0]).filter(c => !/^_/.test(c)).slice(0, 6);
+            const label = mCol && latest[0] ? latest[0][mCol] : 'most recent';
+            let out = `**Latest data from ${dsName} (${label}):** ${latest.length} records\n\n`;
+            latest.slice(0, 8).forEach(r => { out += cols.map(c => `${c}: **${r[c]||'—'}**`).join(' | ') + '\n'; });
+            if (latest.length > 8) out += `\n...and ${latest.length-8} more`;
+            return out + src;
+        }
+
+        if (intent === 'list') {
+            const cols = Object.keys(rows[0]).filter(c => !/^_/.test(c)).slice(0, 5);
+            const show = rows.slice(-10);
+            let out = `**${dsName}${period}** — ${rows.length} records (showing last ${show.length}):\n\n`;
+            show.forEach(r => { out += cols.map(c => `${c}: ${r[c]||'—'}`).join(' | ') + '\n'; });
+            if (rows.length > 10) out += `\n...and ${rows.length-10} more`;
+            return out + src;
+        }
+
+        if (valCol) {
+            const agg = ag._agg(rows, valCol);
+            if (agg) {
+                let out = `**${dsName} — ${valCol}${period}:**\n\n`;
+                const fv = v => ag._fmtVal(v, agg);
+                out += `Total: **${fv(agg.sum)}** | Average: **${fv(agg.avg)}**\n`;
+                out += `Range: ${fv(agg.min)} to ${fv(agg.max)} | Records: ${agg.count}\n`;
+                if (mCol && !timeFilter) {
+                    const months = [...new Set(rows.map(r => r[mCol]).filter(Boolean))];
+                    if (months.length) out += `Period: ${months[0]} to ${months[months.length-1]} (${months.length} months)\n`;
+                }
+                if (groupCol && groupCol !== valCol) {
+                    const top3 = ag._grouped(rows, groupCol, valCol).slice(0,3);
+                    if (top3.length) out += `\nTop ${groupCol}: ${top3.map(([n,v]) => `${n} (${fv(v)})`).join(', ')}\n`;
+                }
+                return out + src;
+            }
+        }
+
+        const cols = Object.keys(rows[0]).filter(c => !/^_/.test(c));
+        return `**${dsName}${period}:** ${rows.length} records\nColumns: ${cols.slice(0,8).join(', ')}${cols.length>8?' ...':''}\n\nTry: "total [column] in ${dsName}" or "top 5 by [column]"` + src;
     }
 };
 
-function sendHaloMsg() {
+const _haloChatHistory = [];
+async function sendHaloMsg() {
     const input = document.getElementById('haloChatInput');
     const q = input.value.trim();
     if (!q) return;
     input.value = '';
     addHaloMsg(q, 'user');
-    const answer = _haloAgent.answer(q);
-    addHaloMsg(answer, 'bot');
+    const useAi = document.getElementById('haloAiToggle').checked;
+    if (useAi) {
+        _haloChatHistory.push({role:'user',content:q});
+        const sendBtn = document.getElementById('haloSendBtn');
+        sendBtn.disabled = true; sendBtn.textContent = '...';
+        try {
+            const res = await fetch('/api/chat', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:q,history:_haloChatHistory.slice(-10)})});
+            const data = await res.json();
+            if (data.error) {
+                if (String(data.error).includes('INVALID_KEY')) { addHaloMsg('Your Groq API key is invalid. Please update the key or uncheck AI to use the offline agent.','bot'); }
+                else { addHaloMsg('AI error: ' + data.error, 'bot'); }
+            } else {
+                _haloChatHistory.push({role:'assistant',content:data.answer});
+                addHaloMsg(data.answer, 'bot');
+            }
+        } catch(e) {
+            addHaloMsg('Could not reach AI service. Make sure the server is running, or uncheck AI to use the offline agent.', 'bot');
+        }
+        sendBtn.disabled = false; sendBtn.textContent = 'Send';
+    } else {
+        try {
+            const answer = _haloAgent.answer(q);
+            addHaloMsg(answer, 'bot');
+        } catch(e) {
+            addHaloMsg("Sorry, I ran into an error processing that question. Try rephrasing — for example, \"total freight cost for 2025\" or \"top 5 countries by cases\".", 'bot');
+        }
+    }
     input.focus();
 }
 
