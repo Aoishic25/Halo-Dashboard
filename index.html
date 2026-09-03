@@ -1430,6 +1430,8 @@ function renderExecutive() {
 
     // YTD Trends Charts
     const ytd = gf(DATA.ytdTrends || [], 'Month');
+    const ytdNoDataMsg = document.getElementById('ytdNoData');
+    if (ytdNoDataMsg) ytdNoDataMsg.remove();
     if (ytd.length > 0) {
         const ytdMonths = [...new Set(ytd.map(r => r.Month))];
         const getYtdVal = (month, desc) => { const r = ytd.find(x => x.Month === month && x.Description === desc); return r ? num(r.Value) : 0; };
@@ -1455,6 +1457,12 @@ function renderExecutive() {
             },
             options:{scales:{y:{ticks:{callback:v=>fmt(v)}},x:{ticks:{maxRotation:45}}}}
         });
+    } else {
+        ['chartYtdStock','chartYtdInbOut'].forEach(id => {
+            if (allCharts[id]) { allCharts[id].destroy(); delete allCharts[id]; }
+        });
+        const anchor = document.getElementById('chartYtdStock');
+        if (anchor) anchor.closest('.chart-row').insertAdjacentHTML('afterend','<p id="ytdNoData" style="text-align:center;color:#999;margin-top:12px">No YTD data for selected period</p>');
     }
 
     // Subjects Table
@@ -2215,24 +2223,23 @@ function renderCost() {
         data: { labels: Object.keys(hubTotals), datasets: [{data:Object.values(hubTotals),backgroundColor:[COLORS.teal,COLORS.orange,COLORS.green,COLORS.amber]}] }
     });
 
-    // Overtime from costingDet
+    // Overtime from costingDet. Zero-overtime months are kept (not dropped) so the
+    // chart still renders a $0 bar instead of vanishing entirely when a filtered
+    // month happens to have no overtime recorded.
     const otByMonth = {};
     cd.forEach(r => {
         const m = r['Month-Year'] || '';
-        const v = num(r['Over Time']);
-        if (m && v > 0) otByMonth[m] = (otByMonth[m]||0) + v;
+        if (m) otByMonth[m] = (otByMonth[m]||0) + num(r['Over Time']);
     });
     const otMonths = Object.keys(otByMonth);
-    if (otMonths.length > 0) {
-        makeChart('chartOvertime', {
-            type: 'bar',
-            data: {
-                labels: otMonths,
-                datasets: [{label:'Overtime Cost (AED)',data:otMonths.map(m=>otByMonth[m]),backgroundColor:COLORS.teal}]
-            },
-            options:{scales:{y:{ticks:{callback:v=>fmt(v)}},x:{ticks:{maxRotation:45,font:{size:10}}}}}
-        });
-    }
+    makeChart('chartOvertime', {
+        type: 'bar',
+        data: {
+            labels: otMonths,
+            datasets: [{label:'Overtime Cost (AED)',data:otMonths.map(m=>otByMonth[m]),backgroundColor:COLORS.teal}]
+        },
+        options:{scales:{y:{ticks:{callback:v=>fmt(v)}},x:{ticks:{maxRotation:45,font:{size:10}}}}}
+    });
 
     // Costing Table
     const ctTb = document.querySelector('#tblCosting tbody');
