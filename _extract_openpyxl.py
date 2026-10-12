@@ -112,7 +112,7 @@ SHEET_MAP = {
     'expiredStock':       ('11. Expiry & Near Expire', 1400, 1, 1, None),
     'freights':           ('7. Freights', 1100, 1, 1, None),
     'outboundCases':      ('22. Outbound Summary', 1600, 1, 1, None),
-    'truckTurnover':      ('9. Truck Turnover Time', 4000, 1, 1, None),
+    'truckTurnover':      ('9. Truck Turnover Time', 8000, 1, 1, None),
     'inboundSummary':     ('17. Inbound Summary', 300, 1, 1, None),
     'inboundDetail':      ('21. Inbound Detail', 15000, 1, 1, None, True),
     'ytdTrends':          ('23. YTD Trends', 400, 1, 1, None),
